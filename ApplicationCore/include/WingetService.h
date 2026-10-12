@@ -11,4 +11,6 @@ class WingetService
 {
   public:
     std::vector<AppInfo> SearchApps(const std::wstring &query) const;
+
+    void InstallApp(const std::wstring &packageId) const;
 };
