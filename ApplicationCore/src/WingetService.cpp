@@ -1,13 +1,13 @@
 // WingetService.cpp
 
 #include "WingetService.h"
+#include "WingetErrors.h"
 
 #include <winrt/Microsoft.Management.Deployment.h>
 #include <winrt/Windows.Foundation.Collections.h>
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -328,5 +328,161 @@ void WingetService::UninstallApp(const std::wstring &packageId, UninstallProgres
     if (onProgress)
     {
         onProgress({UninstallState::Completed, 100.0});
+    }
+}
+
+void WingetService::UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress) const
+{
+    deployment::PackageManager manager;
+
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
+    {
+        throw std::runtime_error("msstore catalog not found");
+    }
+
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
+    if (connection.Status() != deployment::ConnectResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to connect to composite catalog");
+    }
+
+    deployment::FindPackagesOptions options;
+    deployment::PackageMatchFilter filter;
+
+    filter.Field(deployment::PackageMatchField::Id);
+    filter.Option(deployment::PackageFieldMatchOption::Equals);
+    filter.Value(packageId);
+
+    options.Selectors().Append(filter);
+
+    auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to search composite catalog");
+    }
+
+    if (result.Matches().Size() == 0)
+    {
+        throw std::runtime_error("Package not found in composite catalog");
+    }
+
+    auto package = result.Matches().GetAt(0).CatalogPackage();
+    if (!package.InstalledVersion())
+    {
+        throw std::runtime_error("Package is not installed");
+    }
+
+    deployment::InstallOptions updateOptions;
+    updateOptions.AllowUpgradeToUnknownVersion(true);
+
+    auto operation = manager.UpgradePackageAsync(package, updateOptions);
+
+    struct ProgressState
+    {
+        std::mutex mutex;
+        UpdateState lastState = UpdateState::Queued;
+        int lastPercent = -1;
+        uint64_t lastDownloadedBytes = 0;
+    };
+
+    auto progressState = std::make_shared<ProgressState>();
+
+    operation.Progress(
+        [onProgress, progressState](const auto &, const deployment::InstallProgress &progress)
+        {
+            if (!onProgress)
+            {
+                return;
+            }
+
+            UpdateProgressInfo info{};
+
+            switch (progress.State)
+            {
+            case deployment::PackageInstallProgressState::Queued:
+                info.state = UpdateState::Queued;
+                info.percent = 0.0;
+                break;
+
+            case deployment::PackageInstallProgressState::Downloading:
+                info.state = UpdateState::Downloading;
+                info.percent = progress.DownloadProgress * 100.0;
+                info.downloadedBytes = progress.BytesDownloaded;
+                info.totalBytes = progress.BytesRequired;
+                break;
+
+            case deployment::PackageInstallProgressState::Installing:
+            case deployment::PackageInstallProgressState::PostInstall:
+                info.state = UpdateState::Updating;
+                info.percent = progress.InstallationProgress * 100.0;
+                break;
+
+            default:
+                return;
+            }
+
+            info.percent = std::clamp(info.percent, 0.0, 100.0);
+            const int roundedPercent = static_cast<int>(std::round(info.percent));
+
+            {
+                std::lock_guard lock(progressState->mutex);
+
+                const int stateDiff = static_cast<int>(info.state) - static_cast<int>(progressState->lastState);
+
+                const bool stateAdvanced = stateDiff > 0;
+                const bool sameState = stateDiff == 0;
+
+                const bool percentIncreased = roundedPercent > progressState->lastPercent;
+                const bool bytesIncreased =
+                    info.state == UpdateState::Downloading && info.downloadedBytes > progressState->lastDownloadedBytes;
+
+                if (!stateAdvanced && !(sameState && (percentIncreased || bytesIncreased)))
+                {
+                    return;
+                }
+
+                progressState->lastState = info.state;
+                progressState->lastPercent = roundedPercent;
+
+                if (info.state == UpdateState::Downloading)
+                {
+                    progressState->lastDownloadedBytes = info.downloadedBytes;
+                }
+            }
+
+            info.percent = roundedPercent;
+            onProgress(info);
+        });
+
+    auto updateResult = operation.get();
+    if (updateResult.Status() != deployment::InstallResultStatus::Ok)
+    {
+        const auto errorCode = updateResult.ExtendedErrorCode();
+
+        if (static_cast<uint32_t>(errorCode.value) == WingetErrors::UpdateNotApplicable)
+        {
+            return;
+        }
+
+        std::ostringstream message;
+        message << "Package update failed. HRESULT: 0x" << std::hex << static_cast<unsigned int>(errorCode.value);
+
+        throw std::runtime_error(message.str());
+    }
+
+    if (onProgress)
+    {
+        onProgress({UpdateState::Completed, 100.0});
     }
 }

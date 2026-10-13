@@ -24,6 +24,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\AppInfo.h" />
+    <ClInclude Include="include\WingetErrors.h" />
     <ClInclude Include="include\WingetService.h" />
   </ItemGroup>
   <ItemGroup>

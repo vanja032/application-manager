@@ -25,92 +25,137 @@ int main()
         std::wcout << L"App: " << app.name << L'\n';
         std::wcout << L"Package ID: " << app.id << L'\n';
 
-        std::wcout << L"Install this application? (y/n): ";
-
         std::wstring answer;
+
+        // Install
+        std::wcout << L"\nInstall this application? (y/n): ";
         std::wcin >> answer;
 
-        if (answer.empty() || std::towlower(answer[0]) != L'y')
+        if (!answer.empty() && std::towlower(answer[0]) == L'y')
         {
-            return 0;
+            std::wcout << L"Installing...\n";
+
+            service.InstallApp(app.id,
+                               [](const InstallProgressInfo &progress)
+                               {
+                                   std::wstring state;
+
+                                   switch (progress.state)
+                                   {
+                                   case InstallState::Queued:
+                                       state = L"Queued";
+                                       break;
+
+                                   case InstallState::Downloading:
+                                       state = L"Downloading";
+                                       break;
+
+                                   case InstallState::Installing:
+                                       state = L"Installing";
+                                       break;
+
+                                   case InstallState::Completed:
+                                       state = L"Completed";
+                                       break;
+                                   }
+
+                                   std::wcout << state << L": " << progress.percent << L"%";
+
+                                   if (progress.state == InstallState::Downloading)
+                                   {
+                                       constexpr double MB = 1024.0 * 1024.0;
+
+                                       std::wcout << L" (" << progress.downloadedBytes / MB << L" / "
+                                                  << progress.totalBytes / MB << L" MB)";
+                                   }
+
+                                   std::wcout << L'\n';
+                               });
+
+            std::wcout << L"Installation completed successfully.\n";
         }
 
-        std::wcout << L"Installing...\n";
-
-        service.InstallApp(app.id,
-                           [](const InstallProgressInfo &progress)
-                           {
-                               std::wstring state;
-
-                               switch (progress.state)
-                               {
-                               case InstallState::Queued:
-                                   state = L"Queued";
-                                   break;
-
-                               case InstallState::Downloading:
-                                   state = L"Downloading";
-                                   break;
-
-                               case InstallState::Installing:
-                                   state = L"Installing";
-                                   break;
-
-                               case InstallState::Completed:
-                                   state = L"Completed";
-                                   break;
-                               }
-
-                               std::wcout << state << L": " << progress.percent << L"%";
-
-                               if (progress.state == InstallState::Downloading)
-                               {
-                                   constexpr double MB = 1024.0 * 1024.0;
-
-                                   std::wcout << L" (" << progress.downloadedBytes / MB << L" / "
-                                              << progress.totalBytes / MB << L" MB)";
-                               }
-
-                               std::wcout << L'\n';
-                           });
-
-        std::wcout << L"Installation completed successfully.\n";
-
-        std::wcout << L"Uninstall this application? (y/n): ";
-
+        // Update
+        std::wcout << L"\nUpdate this application? (y/n): ";
         std::wcin >> answer;
 
-        if (answer.empty() || std::towlower(answer[0]) != L'y')
+        if (!answer.empty() && std::towlower(answer[0]) == L'y')
         {
-            return 0;
+            std::wcout << L"Updating...\n";
+
+            service.UpdateApp(app.id,
+                              [](const UpdateProgressInfo &progress)
+                              {
+                                  std::wstring state;
+
+                                  switch (progress.state)
+                                  {
+                                  case UpdateState::Queued:
+                                      state = L"Queued";
+                                      break;
+
+                                  case UpdateState::Downloading:
+                                      state = L"Downloading";
+                                      break;
+
+                                  case UpdateState::Updating:
+                                      state = L"Updating";
+                                      break;
+
+                                  case UpdateState::Completed:
+                                      state = L"Completed";
+                                      break;
+                                  }
+
+                                  std::wcout << state << L": " << progress.percent << L"%";
+
+                                  if (progress.state == UpdateState::Downloading)
+                                  {
+                                      constexpr double MB = 1024.0 * 1024.0;
+
+                                      std::wcout << L" (" << progress.downloadedBytes / MB << L" / "
+                                                 << progress.totalBytes / MB << L" MB)";
+                                  }
+
+                                  std::wcout << L'\n';
+                              });
+
+            std::wcout << L"Update finished successfully.\n";
         }
 
-        std::wcout << L"Uninstalling...\n";
+        // Uninstall
+        std::wcout << L"\nUninstall this application? (y/n): ";
+        std::wcin >> answer;
 
-        service.UninstallApp(app.id,
-                             [](const UninstallProgressInfo &progress)
-                             {
-                                 std::wstring state;
+        if (!answer.empty() && std::towlower(answer[0]) == L'y')
+        {
+            std::wcout << L"Uninstalling...\n";
 
-                                 switch (progress.state)
+            service.UninstallApp(app.id,
+                                 [](const UninstallProgressInfo &progress)
                                  {
-                                 case UninstallState::Queued:
-                                     state = L"Queued";
-                                     break;
+                                     std::wstring state;
 
-                                 case UninstallState::Uninstalling:
-                                     state = L"Uninstalling";
-                                     break;
+                                     switch (progress.state)
+                                     {
+                                     case UninstallState::Queued:
+                                         state = L"Queued";
+                                         break;
 
-                                 case UninstallState::Completed:
-                                     state = L"Completed";
-                                     break;
-                                 }
+                                     case UninstallState::Uninstalling:
+                                         state = L"Uninstalling";
+                                         break;
 
-                                 std::wcout << state << L": " << progress.percent << L"%\n";
-                             });
+                                     case UninstallState::Completed:
+                                         state = L"Completed";
+                                         break;
+                                     }
 
-        std::wcout << L"Uninstall finished successfully.\n";
+                                     std::wcout << state << L": " << progress.percent << L"%\n";
+                                 });
+
+            std::wcout << L"Uninstall finished successfully.\n";
+        }
 
         return 0;
     }
