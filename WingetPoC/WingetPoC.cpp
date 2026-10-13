@@ -1,7 +1,7 @@
 // WingetPoC.cpp
 
-#include <iostream>
 #include <cwctype>
+#include <iostream>
 #include <winrt/base.h>
 
 #include "WingetService.h"
@@ -37,7 +37,43 @@ int main()
 
         std::wcout << L"Installing...\n";
 
-        service.InstallApp(app.id);
+        service.InstallApp(app.id,
+                           [](const InstallProgressInfo &progress)
+                           {
+                               std::wstring state;
+
+                               switch (progress.state)
+                               {
+                               case InstallState::Queued:
+                                   state = L"Queued";
+                                   break;
+
+                               case InstallState::Downloading:
+                                   state = L"Downloading";
+                                   break;
+
+                               case InstallState::Installing:
+                                   state = L"Installing";
+                                   break;
+
+                               case InstallState::Completed:
+                                   state = L"Completed";
+                                   break;
+                               }
+
+                               std::wcout << state << L": " << progress.percent << L"%";
+
+                               // Bytes prikazujemo samo tokom preuzimanja.
+                               if (progress.state == InstallState::Downloading)
+                               {
+                                   constexpr double MB = 1024.0 * 1024.0;
+
+                                   std::wcout << L" (" << progress.downloadedBytes / MB << L" / "
+                                              << progress.totalBytes / MB << L" MB)";
+                               }
+
+                               std::wcout << L'\n';
+                           });
 
         std::wcout << L"Installation completed successfully.\n";
 

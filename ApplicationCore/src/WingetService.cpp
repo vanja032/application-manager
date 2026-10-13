@@ -2,9 +2,14 @@
 
 #include "WingetService.h"
 
-#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.Management.Deployment.h>
+#include <winrt/Windows.Foundation.Collections.h>
 
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <mutex>
+#include <sstream>
 #include <stdexcept>
 
 namespace deployment = winrt::Microsoft::Management::Deployment;
@@ -12,7 +17,7 @@ namespace deployment = winrt::Microsoft::Management::Deployment;
 std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
 {
     deployment::PackageManager manager;
-    
+
     auto catalog = manager.GetPackageCatalogByName(L"msstore");
     if (!catalog)
     {
@@ -52,7 +57,7 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
     return apps;
 }
 
-void WingetService::InstallApp(const std::wstring &packageId) const
+void WingetService::InstallApp(const std::wstring &packageId, ProgressCallback onProgress) const
 {
     deployment::PackageManager manager;
 
@@ -87,9 +92,97 @@ void WingetService::InstallApp(const std::wstring &packageId) const
 
     auto operation = manager.InstallPackageAsync(package, installOptions);
 
+    struct ProgressState
+    {
+        std::mutex mutex;
+        InstallState lastState = InstallState::Queued;
+        int lastPercent = -1;
+        uint64_t lastDownloadedBytes = 0;
+    };
+
+    auto progressState = std::make_shared<ProgressState>();
+
+    operation.Progress(
+        [onProgress, progressState](const auto &, const deployment::InstallProgress &progress)
+        {
+            if (!onProgress)
+            {
+                return;
+            }
+
+            InstallProgressInfo info{};
+
+            switch (progress.State)
+            {
+            case deployment::PackageInstallProgressState::Queued:
+                info.state = InstallState::Queued;
+                info.percent = 0.0;
+                break;
+
+            case deployment::PackageInstallProgressState::Downloading:
+                info.state = InstallState::Downloading;
+                info.percent = progress.DownloadProgress * 100.0;
+                info.downloadedBytes = progress.BytesDownloaded;
+                info.totalBytes = progress.BytesRequired;
+                break;
+
+            case deployment::PackageInstallProgressState::Installing:
+                info.state = InstallState::Installing;
+                info.percent = progress.InstallationProgress * 100.0;
+                break;
+
+            default:
+                return;
+            }
+
+            info.percent = std::clamp(info.percent, 0.0, 100.0);
+            const int roundedPercent = static_cast<int>(std::round(info.percent));
+
+            {
+                std::lock_guard lock(progressState->mutex);
+
+                const int stateDiff = static_cast<int>(info.state) - static_cast<int>(progressState->lastState);
+
+                const bool stateAdvanced = stateDiff > 0;
+                const bool sameState = stateDiff == 0;
+
+                const bool percentIncreased = roundedPercent > progressState->lastPercent;
+
+                const bool bytesIncreased = info.state == InstallState::Downloading &&
+                                            info.downloadedBytes > progressState->lastDownloadedBytes;
+
+                if (!stateAdvanced && !(sameState && (percentIncreased || bytesIncreased)))
+                {
+                    return;
+                }
+
+                progressState->lastState = info.state;
+                progressState->lastPercent = roundedPercent;
+
+                if (info.state == InstallState::Downloading)
+                {
+                    progressState->lastDownloadedBytes =
+                        std::max(progressState->lastDownloadedBytes, info.downloadedBytes);
+                }
+            }
+
+            info.percent = roundedPercent;
+            onProgress(info);
+        });
+
     auto installResult = operation.get();
     if (installResult.Status() != deployment::InstallResultStatus::Ok)
     {
-        throw std::runtime_error("Package installation failed");
+        const auto errorCode = installResult.ExtendedErrorCode();
+
+        std::ostringstream message;
+        message << "Package installation failed. HRESULT: 0x" << std::hex << static_cast<unsigned int>(errorCode.value);
+
+        throw std::runtime_error(message.str());
+    }
+
+    if (onProgress)
+    {
+        onProgress({InstallState::Completed, 100.0});
     }
 }
