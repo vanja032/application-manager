@@ -63,7 +63,6 @@ int main()
 
                                std::wcout << state << L": " << progress.percent << L"%";
 
-                               // Bytes prikazujemo samo tokom preuzimanja.
                                if (progress.state == InstallState::Downloading)
                                {
                                    constexpr double MB = 1024.0 * 1024.0;
@@ -76,6 +75,42 @@ int main()
                            });
 
         std::wcout << L"Installation completed successfully.\n";
+
+        std::wcout << L"Uninstall this application? (y/n): ";
+
+        std::wcin >> answer;
+
+        if (answer.empty() || std::towlower(answer[0]) != L'y')
+        {
+            return 0;
+        }
+
+        std::wcout << L"Uninstalling...\n";
+
+        service.UninstallApp(app.id,
+                             [](const UninstallProgressInfo &progress)
+                             {
+                                 std::wstring state;
+
+                                 switch (progress.state)
+                                 {
+                                 case UninstallState::Queued:
+                                     state = L"Queued";
+                                     break;
+
+                                 case UninstallState::Uninstalling:
+                                     state = L"Uninstalling";
+                                     break;
+
+                                 case UninstallState::Completed:
+                                     state = L"Completed";
+                                     break;
+                                 }
+
+                                 std::wcout << state << L": " << progress.percent << L"%\n";
+                             });
+
+        std::wcout << L"Uninstall finished successfully.\n";
 
         return 0;
     }

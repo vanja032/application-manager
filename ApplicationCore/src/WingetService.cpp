@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -40,6 +41,10 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
     options.Selectors().Append(filter);
 
     auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to search msstore catalog");
+    }
 
     std::vector<AppInfo> apps;
 
@@ -81,6 +86,11 @@ void WingetService::InstallApp(const std::wstring &packageId, ProgressCallback o
     options.Selectors().Append(filter);
 
     auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to search msstore catalog");
+    }
+
     if (result.Matches().Size() == 0)
     {
         throw std::runtime_error("Package not found");
@@ -184,5 +194,139 @@ void WingetService::InstallApp(const std::wstring &packageId, ProgressCallback o
     if (onProgress)
     {
         onProgress({InstallState::Completed, 100.0});
+    }
+}
+
+void WingetService::UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress) const
+{
+    deployment::PackageManager manager;
+
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
+    {
+        throw std::runtime_error("msstore catalog not found");
+    }
+
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
+    if (connection.Status() != deployment::ConnectResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to connect to composite catalog");
+    }
+
+    deployment::FindPackagesOptions options;
+    deployment::PackageMatchFilter filter;
+
+    filter.Field(deployment::PackageMatchField::Id);
+    filter.Option(deployment::PackageFieldMatchOption::Equals);
+    filter.Value(packageId);
+
+    options.Selectors().Append(filter);
+
+    auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to search composite catalog");
+    }
+
+    if (result.Matches().Size() == 0)
+    {
+        throw std::runtime_error("Package not found in composite catalog");
+    }
+
+    auto package = result.Matches().GetAt(0).CatalogPackage();
+    if (!package.InstalledVersion())
+    {
+        throw std::runtime_error("Package is not installed");
+    }
+
+    deployment::UninstallOptions uninstallOptions;
+    auto operation = manager.UninstallPackageAsync(package, uninstallOptions);
+
+    struct ProgressState
+    {
+        std::mutex mutex;
+        UninstallState lastState = UninstallState::Queued;
+        int lastPercent = -1;
+    };
+
+    auto progressState = std::make_shared<ProgressState>();
+
+    operation.Progress(
+        [onProgress, progressState](const auto &, const deployment::UninstallProgress &progress)
+        {
+            if (!onProgress)
+            {
+                return;
+            }
+
+            UninstallProgressInfo info{};
+
+            switch (progress.State)
+            {
+            case deployment::PackageUninstallProgressState::Queued:
+                info.state = UninstallState::Queued;
+                info.percent = 0.0;
+                break;
+
+            case deployment::PackageUninstallProgressState::Uninstalling:
+            case deployment::PackageUninstallProgressState::PostUninstall:
+                info.state = UninstallState::Uninstalling;
+                info.percent = progress.UninstallationProgress * 100.0;
+                break;
+
+            default:
+                return;
+            }
+
+            info.percent = std::clamp(info.percent, 0.0, 100.0);
+            const int roundedPercent = static_cast<int>(std::round(info.percent));
+
+            {
+                std::lock_guard lock(progressState->mutex);
+
+                const int stateDiff = static_cast<int>(info.state) - static_cast<int>(progressState->lastState);
+
+                const bool stateAdvanced = stateDiff > 0;
+                const bool sameState = stateDiff == 0;
+
+                const bool percentIncreased = roundedPercent > progressState->lastPercent;
+
+                if (!stateAdvanced && !(sameState && percentIncreased))
+                {
+                    return;
+                }
+
+                progressState->lastState = info.state;
+                progressState->lastPercent = roundedPercent;
+            }
+
+            info.percent = roundedPercent;
+            onProgress(info);
+        });
+
+    auto uninstallResult = operation.get();
+    if (uninstallResult.Status() != deployment::UninstallResultStatus::Ok)
+    {
+        const auto errorCode = uninstallResult.ExtendedErrorCode();
+
+        std::ostringstream message;
+        message << "Package uninstall failed. HRESULT: 0x" << std::hex << static_cast<unsigned int>(errorCode.value);
+
+        throw std::runtime_error(message.str());
+    }
+
+    if (onProgress)
+    {
+        onProgress({UninstallState::Completed, 100.0});
     }
 }
