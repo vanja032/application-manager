@@ -14,7 +14,7 @@ updated: 2026-10-14
 
 `AppCardModel`: name, package ID, source, availability, installed version, available version, percent, downloaded MB, total MB, and `catalogIndex` for the Relevance sort.
 
-`AppAvailability`: NotInstalled, Installed, UpdateAvailable, Installing, Updating.
+`AppAvailability`: NotInstalled, Installed, UpdateAvailable, Queued, Downloading, Installing, Updating, Error. `errorText` is the install failure message.
 
 ## Layout
 
@@ -22,9 +22,10 @@ Three zones: a 48 px package icon, identity (stretches), a status panel fixed at
 
 Status:
 
-- Installing and Updating: [[Circular progress]] plus the title.
+- Queued, Downloading, Installing, and Updating: [[Circular progress]] plus the phase title. Downloading also shows megabytes when the total is known.
+- Error: a red dot, the title Error, and the message wrapped in the status column.
 - Everything else: a row with a 16 px icon and the title, then details indented by 24 px. The check and the update icon are the same size and aligned with the first line. The Not installed dot sits vertically with that text.
 
-Action: primary and secondary buttons, 112×36. There are no click handlers. Installing has no Cancel.
+Action: primary and secondary buttons, 112×36. Not installed and Error emit `installRequested`. Installed has no button yet, because uninstall is not connected. Update available still shows Update and Uninstall without handlers. Queued, Downloading, and Installing have no Cancel.
 
 Related: [[Mock catalog]].

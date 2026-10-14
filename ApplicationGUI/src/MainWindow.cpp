@@ -20,6 +20,7 @@
 #include <QtWidgets/QToolButton>
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 
 class ToggleSwitch : public QWidget
@@ -424,6 +425,104 @@ void MainWindow::startSearch()
     });
 }
 
+void MainWindow::startInstall(const QString &packageId)
+{
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return;
+    }
+
+    const AppAvailability availability = card->availability();
+    if (availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+        availability == AppAvailability::Installing || availability == AppAvailability::Updating)
+    {
+        return;
+    }
+
+    showPackageStatus(packageId, AppAvailability::Queued, 0, 0, 0, QString());
+
+    m_service.InstallAppAsync(
+        packageId.toStdWString(),
+        [this, packageId](const InstallProgressInfo &info) {
+            const int percent = static_cast<int>(info.percent);
+            const auto megabytes = [](std::uint64_t bytes) { return static_cast<int>(bytes / (1024ull * 1024ull)); };
+            QMetaObject::invokeMethod(
+                this,
+                [this, packageId, info, percent, megabytes]() {
+                    switch (info.state)
+                    {
+                    case InstallState::Queued:
+                        showPackageStatus(packageId, AppAvailability::Queued, 0, 0, 0, QString());
+                        break;
+                    case InstallState::Downloading:
+                        showPackageStatus(packageId, AppAvailability::Downloading, percent,
+                                          megabytes(info.downloadedBytes), megabytes(info.totalBytes), QString());
+                        break;
+                    case InstallState::Installing:
+                        showPackageStatus(packageId, AppAvailability::Installing, percent, 0, 0, QString());
+                        break;
+                    case InstallState::Completed:
+                        showPackageStatus(packageId, AppAvailability::Installed, 100, 0, 0, QString());
+                        break;
+                    }
+                },
+                Qt::QueuedConnection);
+        },
+        [this, packageId](InstallCompletion completion) {
+            QMetaObject::invokeMethod(
+                this,
+                [this, packageId, completion]() {
+                    if (!completion.error.empty())
+                    {
+                        showPackageStatus(packageId, AppAvailability::Error, 0, 0, 0,
+                                          QString::fromStdString(completion.error));
+                        return;
+                    }
+
+                    showPackageStatus(packageId, AppAvailability::Installed, 100, 0, 0, QString());
+                },
+                Qt::QueuedConnection);
+        });
+}
+
+void MainWindow::showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
+                                   int totalMb, const QString &errorText)
+{
+    InstallUiState &state = m_installUi[packageId];
+    const AppAvailability previous = state.availability;
+    state.availability = availability;
+    state.progressPercent = percent;
+    state.downloadedMb = downloadedMb;
+    state.totalMb = totalMb;
+    state.error = errorText;
+
+    AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return;
+    }
+
+    card->applyStatus(availability, percent, downloadedMb, totalMb, errorText);
+    if (previous != availability)
+    {
+        refreshAppList();
+    }
+}
+
+AppCard *MainWindow::findCard(const QString &packageId) const
+{
+    for (AppCard *card : m_cards)
+    {
+        if (card->packageId() == packageId)
+        {
+            return card;
+        }
+    }
+
+    return nullptr;
+}
+
 void MainWindow::showStatus(const QString &text)
 {
     clearCards();
@@ -463,9 +562,24 @@ void MainWindow::applySearchCompletion(const SearchCompletion &completion)
         model.packageId = QString::fromStdWString(app.id);
         model.source = QStringLiteral("Microsoft Store");
         model.catalogIndex = index++;
+        model.hasAvailability = true;
+        model.availability = app.installed ? AppAvailability::Installed : AppAvailability::NotInstalled;
+        model.installedVersion = QString::fromStdWString(app.installedVersion);
+
+        const auto saved = m_installUi.constFind(model.packageId);
+        if (saved != m_installUi.constEnd())
+        {
+            model.availability = saved->availability;
+            model.progressPercent = saved->progressPercent;
+            model.downloadedMb = saved->downloadedMb;
+            model.totalMb = saved->totalMb;
+            model.errorText = saved->error;
+        }
 
         auto *card = new AppCard(model, ui.appListContainer);
+        card->setDarkMode(m_darkMode);
         card->hide();
+        connect(card, &AppCard::installRequested, this, &MainWindow::startInstall, Qt::QueuedConnection);
         m_cards.push_back(card);
     }
 
@@ -552,27 +666,17 @@ bool MainWindow::cardMatches(const AppCard *card) const
             return false;
         }
     }
-    else
+    else if (m_section == Section::Installed)
     {
         const AppAvailability availability = card->availability();
-        if (m_section == Section::Installed && availability == AppAvailability::NotInstalled)
+        if (availability != AppAvailability::Installed && availability != AppAvailability::UpdateAvailable)
         {
             return false;
         }
-        if (m_section == Section::Updates && availability != AppAvailability::UpdateAvailable)
-        {
-            return false;
-        }
-
-        const int filterId = m_filterGroup->checkedId();
-        if (filterId == static_cast<int>(StatusFilter::Installed) && availability == AppAvailability::NotInstalled)
-        {
-            return false;
-        }
-        if (filterId == static_cast<int>(StatusFilter::NotInstalled) && availability != AppAvailability::NotInstalled)
-        {
-            return false;
-        }
+    }
+    else if (m_section == Section::Updates && card->availability() != AppAvailability::UpdateAvailable)
+    {
+        return false;
     }
 
     const QString source = ui.sourceCombo->currentText();

@@ -38,7 +38,8 @@ struct WorkerApartment
 
 } // namespace
 
-WingetService::WingetService() : m_worker(&WingetService::workerMain, this)
+WingetService::WingetService()
+    : m_installWorker(&WingetService::installWorkerMain, this), m_worker(&WingetService::workerMain, this)
 {
 }
 
@@ -51,6 +52,26 @@ WingetService::~WingetService()
     }
 
     m_cv.notify_one();
+
+    std::function<void()> cancel;
+    {
+        std::lock_guard lock(m_installMutex);
+        m_installStop = true;
+        m_installQueue.clear();
+        cancel = std::move(m_cancelActive);
+    }
+
+    if (cancel)
+    {
+        cancel();
+    }
+
+    m_installCv.notify_all();
+
+    if (m_installWorker.joinable())
+    {
+        m_installWorker.join();
+    }
 
     if (m_worker.joinable())
     {
@@ -152,6 +173,12 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
         app.id = package.Id().c_str();
         app.name = package.Name().c_str();
 
+        if (auto installedVersion = package.InstalledVersion())
+        {
+            app.installed = true;
+            app.installedVersion = installedVersion.Version().c_str();
+        }
+
         apps.push_back(std::move(app));
     }
 
@@ -159,6 +186,109 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
 }
 
 void WingetService::InstallApp(const std::wstring &packageId, ProgressCallback onProgress) const
+{
+    installPackage(packageId, std::move(onProgress), {});
+}
+
+void WingetService::InstallAppAsync(const std::wstring &packageId, ProgressCallback onProgress, InstallCallback onComplete)
+{
+    {
+        std::lock_guard lock(m_installMutex);
+        if (m_installStop || m_activeInstallId == packageId)
+        {
+            return;
+        }
+
+        for (const InstallRequest &queued : m_installQueue)
+        {
+            if (queued.packageId == packageId)
+            {
+                return;
+            }
+        }
+
+        m_installQueue.push_back(InstallRequest{packageId, std::move(onProgress), std::move(onComplete)});
+    }
+
+    m_installCv.notify_one();
+}
+
+void WingetService::installWorkerMain()
+{
+    const WorkerApartment apartment;
+
+    for (;;)
+    {
+        InstallRequest request;
+        {
+            std::unique_lock lock(m_installMutex);
+            m_installCv.wait(lock, [this] { return m_installStop || !m_installQueue.empty(); });
+
+            if (m_installStop)
+            {
+                return;
+            }
+
+            request = std::move(m_installQueue.front());
+            m_installQueue.pop_front();
+            m_activeInstallId = request.packageId;
+        }
+
+        struct ClearActive
+        {
+            WingetService *self;
+
+            ~ClearActive()
+            {
+                std::lock_guard lock(self->m_installMutex);
+                self->m_cancelActive = nullptr;
+                self->m_activeInstallId.clear();
+            }
+        } clearActive{this};
+
+        InstallCompletion completion;
+        try
+        {
+            installPackage(request.packageId, request.onProgress, [this](std::function<void()> cancel) {
+                std::lock_guard lock(m_installMutex);
+                if (m_installStop)
+                {
+                    cancel();
+                    return;
+                }
+
+                m_cancelActive = std::move(cancel);
+            });
+        }
+        catch (const winrt::hresult_error &ex)
+        {
+            completion.error = winrt::to_string(ex.message());
+        }
+        catch (const std::exception &ex)
+        {
+            completion.error = ex.what();
+        }
+
+        bool stopped = false;
+        {
+            std::lock_guard lock(m_installMutex);
+            stopped = m_installStop;
+        }
+
+        if (stopped)
+        {
+            return;
+        }
+
+        if (request.onComplete)
+        {
+            request.onComplete(std::move(completion));
+        }
+    }
+}
+
+void WingetService::installPackage(const std::wstring &packageId, ProgressCallback onProgress,
+                                   std::function<void(std::function<void()>)> armCancel) const
 {
     deployment::PackageManager manager;
 
@@ -197,6 +327,10 @@ void WingetService::InstallApp(const std::wstring &packageId, ProgressCallback o
     deployment::InstallOptions installOptions;
 
     auto operation = manager.InstallPackageAsync(package, installOptions);
+    if (armCancel)
+    {
+        armCancel([operation]() mutable { operation.Cancel(); });
+    }
 
     struct ProgressState
     {

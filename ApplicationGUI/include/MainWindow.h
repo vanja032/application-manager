@@ -3,13 +3,15 @@
 #include <cstdint>
 #include <vector>
 
+#include <QtCore/QHash>
+#include <QtCore/QString>
 #include <QtWidgets/QMainWindow>
 
+#include "AppCard.h"
 #include "WingetService.h"
 
 #include "ui_MainWindow.h"
 
-class AppCard;
 class QButtonGroup;
 class QEvent;
 class QFrame;
@@ -53,6 +55,10 @@ class MainWindow : public QMainWindow
     void applyTheme(bool dark);
     void showSection(Section section);
     void startSearch();
+    void startInstall(const QString &packageId);
+    void showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
+                           int totalMb, const QString &errorText);
+    AppCard *findCard(const QString &packageId) const;
     void showStatus(const QString &text);
     void clearCards();
     void applySearchCompletion(const SearchCompletion &completion);
@@ -71,7 +77,17 @@ class MainWindow : public QMainWindow
     std::vector<AppCard *> m_cards;
     Section m_section = Section::Discover;
     bool m_darkMode = false;
+    struct InstallUiState
+    {
+        AppAvailability availability = AppAvailability::NotInstalled;
+        int progressPercent = 0;
+        int downloadedMb = 0;
+        int totalMb = 0;
+        QString error;
+    };
+
     std::uint64_t m_searchGeneration = 0;
     QString m_statusText;
+    QHash<QString, InstallUiState> m_installUi;
     WingetService m_service;
 };

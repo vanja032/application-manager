@@ -31,6 +31,27 @@ QString versionText(const QString &prefix, const QString &version)
     return prefix + version;
 }
 
+bool isBusy(AppAvailability availability)
+{
+    return availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+           availability == AppAvailability::Installing || availability == AppAvailability::Updating;
+}
+
+QString busyTitle(AppAvailability availability)
+{
+    switch (availability)
+    {
+    case AppAvailability::Queued:
+        return QStringLiteral("Queued");
+    case AppAvailability::Downloading:
+        return QStringLiteral("Downloading...");
+    case AppAvailability::Updating:
+        return QStringLiteral("Updating...");
+    default:
+        return QStringLiteral("Installing...");
+    }
+}
+
 } // namespace
 
 AppCard::AppCard(const AppCardModel &model, QWidget *parent) : QWidget(parent), m_model(model)
@@ -54,21 +75,12 @@ AppCard::AppCard(const AppCardModel &model, QWidget *parent) : QWidget(parent), 
     identity->addWidget(name);
     identity->addWidget(packageId);
 
-    auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(16, 14, 16, 14);
-    layout->setSpacing(16);
-    layout->addWidget(icon, 0, Qt::AlignVCenter);
-    layout->addLayout(identity, 3);
-    if (m_model.hasAvailability)
-    {
-        layout->addWidget(createStatusPanel(), 0, Qt::AlignVCenter);
-        layout->addStretch(1);
-        layout->addWidget(createActionPanel(), 0, Qt::AlignVCenter);
-    }
-    else
-    {
-        layout->addStretch(1);
-    }
+    m_layout = new QHBoxLayout(this);
+    m_layout->setContentsMargins(16, 14, 16, 14);
+    m_layout->setSpacing(16);
+    m_layout->addWidget(icon, 0, Qt::AlignVCenter);
+    m_layout->addLayout(identity, 1);
+    rebuildStatusAndActions();
 }
 
 QString AppCard::name() const
@@ -101,11 +113,76 @@ int AppCard::catalogIndex() const
     return m_model.catalogIndex;
 }
 
+void AppCard::applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText)
+{
+    const bool wasBusy = isBusy(m_model.availability);
+    const bool nowBusy = isBusy(availability);
+    m_model.availability = availability;
+    m_model.progressPercent = percent;
+    m_model.downloadedMb = downloadedMb;
+    m_model.totalMb = totalMb;
+    m_model.errorText = errorText;
+    m_model.hasAvailability = true;
+
+    if (wasBusy && nowBusy && m_progress && m_phaseLabel && m_bytesLabel)
+    {
+        m_progress->setValue(percent);
+        m_phaseLabel->setText(busyTitle(availability));
+        if (totalMb > 0)
+        {
+            m_bytesLabel->setText(QStringLiteral("%1 MB of %2 MB").arg(downloadedMb).arg(totalMb));
+            m_bytesLabel->setVisible(true);
+        }
+        else
+        {
+            m_bytesLabel->setVisible(false);
+        }
+        return;
+    }
+
+    rebuildStatusAndActions();
+}
+
 void AppCard::setDarkMode(bool dark)
 {
+    m_dark = dark;
     if (m_progress)
     {
         m_progress->setDarkMode(dark);
+    }
+}
+
+void AppCard::rebuildStatusAndActions()
+{
+    if (m_statusPanel)
+    {
+        m_layout->removeWidget(m_statusPanel);
+        m_statusPanel->deleteLater();
+        m_statusPanel = nullptr;
+        m_progress = nullptr;
+        m_phaseLabel = nullptr;
+        m_bytesLabel = nullptr;
+    }
+
+    if (m_actionPanel)
+    {
+        m_layout->removeWidget(m_actionPanel);
+        m_actionPanel->deleteLater();
+        m_actionPanel = nullptr;
+    }
+
+    if (!m_model.hasAvailability)
+    {
+        return;
+    }
+
+    m_statusPanel = createStatusPanel();
+    m_actionPanel = createActionPanel();
+    m_layout->addWidget(m_statusPanel, 0, Qt::AlignVCenter);
+    m_layout->addWidget(m_actionPanel, 0, Qt::AlignVCenter);
+    if (m_progress)
+    {
+        m_progress->setDarkMode(m_dark);
     }
 }
 
@@ -145,7 +222,7 @@ QWidget *AppCard::createStatusPanel()
     auto *panel = new QWidget(this);
     panel->setFixedWidth(280);
 
-    if (m_model.availability == AppAvailability::Installing || m_model.availability == AppAvailability::Updating)
+    if (isBusy(m_model.availability))
     {
         auto *row = new QHBoxLayout(panel);
         row->setContentsMargins(0, 0, 0, 0);
@@ -158,16 +235,13 @@ QWidget *AppCard::createStatusPanel()
         auto *lines = new QVBoxLayout();
         lines->setContentsMargins(0, 0, 0, 0);
         lines->setSpacing(1);
-        const QString operation = m_model.availability == AppAvailability::Updating ? QStringLiteral("Updating...")
-                                                                                    : QStringLiteral("Installing...");
-        auto *title = makeLabel(operation, QStringLiteral("statusBusy"), panel);
-        title->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        lines->addWidget(title);
-        if (m_model.totalMb > 0)
-        {
-            lines->addWidget(makeLabel(QStringLiteral("%1 MB of %2 MB").arg(m_model.downloadedMb).arg(m_model.totalMb),
-                                        QStringLiteral("statusDetail"), panel));
-        }
+        m_phaseLabel = makeLabel(busyTitle(m_model.availability), QStringLiteral("statusBusy"), panel);
+        m_phaseLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        lines->addWidget(m_phaseLabel);
+        m_bytesLabel = makeLabel(QStringLiteral("%1 MB of %2 MB").arg(m_model.downloadedMb).arg(m_model.totalMb),
+                                  QStringLiteral("statusDetail"), panel);
+        m_bytesLabel->setVisible(m_model.totalMb > 0);
+        lines->addWidget(m_bytesLabel);
         row->addLayout(lines);
         row->addStretch(1);
         return panel;
@@ -193,6 +267,11 @@ QWidget *AppCard::createStatusPanel()
         icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Refresh, QColor(QStringLiteral("#0078D4")), 16), panel);
         title = makeLabel(QStringLiteral("Update available"), QStringLiteral("statusUpdate"), panel);
     }
+    else if (m_model.availability == AppAvailability::Error)
+    {
+        icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Dot, QColor(QStringLiteral("#D13438")), 16), panel);
+        title = makeLabel(QStringLiteral("Error"), QStringLiteral("statusError"), panel);
+    }
     else
     {
         icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Dot, QColor(QStringLiteral("#8B919A")), 16), panel);
@@ -217,6 +296,12 @@ QWidget *AppCard::createStatusPanel()
         addDetailLine(column, versionText(QStringLiteral("Installed version: "), m_model.installedVersion), panel);
         addDetailLine(column, versionText(QStringLiteral("Available version: "), m_model.availableVersion), panel);
     }
+    else if (m_model.availability == AppAvailability::Error && !m_model.errorText.isEmpty())
+    {
+        auto *detail = makeLabel(m_model.errorText, QStringLiteral("statusDetail"), panel);
+        detail->setWordWrap(true);
+        column->addWidget(detail);
+    }
 
     return panel;
 }
@@ -235,13 +320,11 @@ QWidget *AppCard::createActionPanel()
         column->addWidget(createButton(QStringLiteral("Update"), true));
         column->addWidget(createButton(QStringLiteral("Uninstall"), false));
     }
-    else if (m_model.availability == AppAvailability::Installed)
+    else if (m_model.availability == AppAvailability::NotInstalled || m_model.availability == AppAvailability::Error)
     {
-        column->addWidget(createButton(QStringLiteral("Uninstall"), false));
-    }
-    else if (m_model.availability == AppAvailability::NotInstalled)
-    {
-        column->addWidget(createButton(QStringLiteral("Install"), true));
+        auto *install = createButton(QStringLiteral("Install"), true);
+        connect(install, &QPushButton::clicked, this, [this]() { emit installRequested(m_model.packageId); });
+        column->addWidget(install);
     }
 
     return panel;

@@ -8,4 +8,6 @@ struct AppInfo
 {
     std::wstring id;
     std::wstring name;
+    bool installed = false;
+    std::wstring installedVersion;
 };

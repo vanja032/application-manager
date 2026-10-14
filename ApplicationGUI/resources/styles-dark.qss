@@ -360,6 +360,14 @@ QLabel#statusMuted {
     margin: 0;
 }
 
+QLabel#statusError {
+    color: #F28B82;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
 QLabel#settingsTitle,
 QLabel#aboutTitle {
     color: #F3F5F8;

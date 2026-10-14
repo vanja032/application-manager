@@ -22,6 +22,8 @@ Updates carries a badge, a child of the button, 22×22, transparent to the mouse
 
 Search row: the field and a Search button, 104×40. The field is `QFrame#searchFrame` (margins 16 and 14, spacing 10, height 40) with an icon, a plain `QLineEdit`, and `QToolButton#searchClearButton`. The built-in clear button is disabled. The X is visible when the text is not empty, uses `PointingHandCursor`, and clears the field. Focus on the frame is the dynamic property `focused`, so QSS changes the border. The initial text is `whatsapp`, and the window starts that search on launch. Search and Enter call `SearchAppsAsync`. Results are applied with `QMetaObject::invokeMethod` and `Qt::QueuedConnection`. A generation counter drops a result when a newer search has already started. While the search runs, the list shows "Searching...". Failure shows the error text. No matches show "No applications match your search."
 
+Each result card has a status. The catalog `InstalledVersion` chooses Installed or Not installed. Install calls `InstallAppAsync` and does not block the window. The card then shows Queued, Downloading with megabytes, Installing, Installed, or Error. Progress and the final result are applied on the UI thread. A new search keeps that state for the same package id. All, Installed, and Not installed still do not filter the list.
+
 Beside search is the Source column. The combo has only Microsoft Store. Source and Sort by use `AnchoredComboBox`, so the list opens under the field. The selected row stays in its place in the list and does not cover the closed field.
 
 Filters: All, Installed, Not installed stay on screen. They do not change the search list yet, because a search card has no install status. Sort: Relevance (result order) and Name (`localeAwareCompare`).
@@ -34,7 +36,7 @@ The Settings text says the catalog uses the Microsoft Store and that search matc
 
 ## Filtering
 
-A search card has no install status. On Discover it stays visible for All, Installed, and Not installed. Those chips are not applied until a card has a real status. The Installed and Updates sections still hide it, because those states are not in `AppInfo` yet.
+All, Installed, and Not installed do not change which cards are visible. The Installed section shows cards whose status is Installed or Update available. Updates shows only Update available. Discover shows the current search, including a card that is queued, downloading, installing, or failed.
 
 Sections: Discover shows the current search. Installed and Updates show the empty state until status exists. Settings and About switch the stack page.
 

@@ -16,3 +16,4 @@ updated: 2026-10-14
 - 2026-10-14: Search uses `Filters` and returns up to 10 matches. The Windows logo tiles are square.
 - 2026-10-14: Recorded how `msstore` drops common words, and the search advantages still open versus that index. See [[Store search]].
 - 2026-10-14: All, Installed, and Not installed stay visible and do not filter search cards until install status exists.
+- 2026-10-14: Install from the GUI calls `InstallAppAsync` on its own Core worker. The card shows Queued, Downloading, Installing, Installed, or Error.

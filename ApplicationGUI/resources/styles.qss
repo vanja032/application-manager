@@ -356,6 +356,14 @@ QLabel#statusMuted {
     margin: 0;
 }
 
+QLabel#statusError {
+    color: #D13438;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
 QLabel#statusBusy {
     color: #202124;
     font-size: 13px;

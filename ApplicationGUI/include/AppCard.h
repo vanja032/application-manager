@@ -8,8 +8,11 @@ enum class AppAvailability
     NotInstalled,
     Installed,
     UpdateAvailable,
+    Queued,
+    Downloading,
     Installing,
-    Updating
+    Updating,
+    Error
 };
 
 struct AppCardModel
@@ -25,9 +28,12 @@ struct AppCardModel
     int totalMb = 0;
     int catalogIndex = 0;
     bool hasAvailability = false;
+    QString errorText;
 };
 
 class CircularProgress;
+class QHBoxLayout;
+class QLabel;
 class QPushButton;
 
 class AppCard : public QWidget
@@ -44,16 +50,27 @@ class AppCard : public QWidget
     bool hasAvailability() const;
     int catalogIndex() const;
 
+    void applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText);
     void setDarkMode(bool dark);
+
+  signals:
+    void installRequested(const QString &packageId);
 
   protected:
     void paintEvent(QPaintEvent *event) override;
 
   private:
+    void rebuildStatusAndActions();
     QWidget *createStatusPanel();
     QWidget *createActionPanel();
     QPushButton *createButton(const QString &text, bool primary) const;
 
     AppCardModel m_model;
+    QHBoxLayout *m_layout = nullptr;
+    QWidget *m_statusPanel = nullptr;
+    QWidget *m_actionPanel = nullptr;
+    QLabel *m_phaseLabel = nullptr;
+    QLabel *m_bytesLabel = nullptr;
     CircularProgress *m_progress = nullptr;
+    bool m_dark = false;
 };

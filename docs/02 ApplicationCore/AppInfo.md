@@ -15,7 +15,9 @@ struct AppInfo
 {
     std::wstring id;
     std::wstring name;
+    bool installed = false;
+    std::wstring installedVersion;
 };
 ```
 
-This is the only model the backend returns from search. It has no source, version, install status, or progress. The GUI model `AppCardModel` is wider and lives only in [[ApplicationGUI]]. Joining the two models is still open.
+Search fills `installed` from the catalog package `InstalledVersion`. A null version means the package is not installed. Progress during install is not stored here. The GUI keeps that on the card.

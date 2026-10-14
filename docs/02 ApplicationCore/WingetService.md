@@ -13,8 +13,9 @@ updated: 2026-10-14
 ## Public surface
 
 - `SearchApps(query)` returns `std::vector<AppInfo>` and blocks until the search finishes. [[WingetPoC]] still uses this.
-- `SearchAppsAsync(query, callback)` returns immediately. A Core-owned worker thread calls `winrt::init_apartment` and runs `SearchApps`. The callback receives a `SearchCompletion` with `apps` or `error`. The worker is joined in the destructor. A newer request replaces one that has not started. Install, update, and uninstall are unchanged.
-- `InstallApp(packageId, onProgress)`
+- `SearchAppsAsync(query, callback)` returns immediately. A Core-owned worker thread calls `winrt::init_apartment` and runs `SearchApps`. The callback receives a `SearchCompletion` with `apps` or `error`. The worker is joined in the destructor. A newer request replaces one that has not started.
+- `InstallApp(packageId, onProgress)` blocks until install finishes. [[WingetPoC]] still uses this.
+- `InstallAppAsync(packageId, onProgress, onComplete)` returns immediately. A second Core worker, separate from search, runs installs one at a time. Progress uses the same `InstallProgressInfo` values as the synchronous method. `onComplete` receives an `InstallCompletion` whose `error` is empty on success. A second request for a package that is already queued or running is ignored. Closing the service cancels the active WinRT operation and joins the worker. Update and uninstall are unchanged.
 - `UninstallApp(packageId, onProgress)`
 - `UpdateApp(packageId, onProgress)`
 
@@ -38,7 +39,7 @@ If the catalog is missing, the connection is not Ok, or the search is not Ok, th
 
 ## Install and uninstall
 
-The package is looked up by id in the same `msstore` catalog. An empty result is the error "Package not found". Install is `InstallPackageAsync`. Uninstall is `UninstallPackageAsync`. After `.get()`, the status must be Ok, otherwise the method throws the HRESULT in the message.
+The package is looked up by id in the same `msstore` catalog. An empty result is the error "Package not found". Install is `InstallPackageAsync`. Uninstall is `UninstallPackageAsync`. After `.get()`, the status must be Ok, otherwise the method throws the HRESULT in the message. The async install path uses that same body. Its worker catches the exception and puts the text in `InstallCompletion.error`. Search also reads `InstalledVersion` on each match.
 
 ## Update
 
