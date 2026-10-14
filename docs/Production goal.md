@@ -42,14 +42,14 @@ The assessment asks for an independent choice of winget integration aimed at Mic
 
 | Choice | Status |
 | --- | --- |
-| Backend: in-process Windows Package Manager COM (`Microsoft.Management.Deployment`), catalog `msstore`, wrapped by [[WingetService]] | Met as the selected integration. The GUI uses it for search, install, and uninstall. Update is still console-only. See [[Decision 0006 Stack]]. |
+| Backend: in-process Windows Package Manager COM (`Microsoft.Management.Deployment`), catalog `msstore`, wrapped by [[WingetService]] | Met as the selected integration. The GUI uses it for search, install, uninstall, and update. See [[Decision 0006 Stack]]. |
 | UI: Qt 6.12 Widgets | Met as the selected framework. See [[Decision 0006 Stack]]. |
 
 ### 3. UI and asynchronous architecture
 
 | Requirement | Status |
 | --- | --- |
-| GUI stays responsive. Download, install, and status queries never block the interface | Partial. Search, install, and uninstall each run on a Core worker. Update still blocks inside `.get()` and is not called by the GUI. |
+| GUI stays responsive. Download, install, and status queries never block the interface | Partial. Search, install, uninstall, and update each run on a Core worker. |
 
 ## Bonus features
 
@@ -59,7 +59,7 @@ These are in scope for the finished application.
 | --- | --- |
 | Launch an installed Microsoft Store app from the UI | Not met. |
 | Uninstall from the application | Partial. The GUI uninstalls a search result that is already installed and shows progress or Error. There is no separate list of every installed app. |
-| Detect available updates and apply them | Partial. [[WingetService]] and [[WingetPoC]] can update. The GUI has no update status yet. |
+| Detect available updates and apply them | Partial. Search marks `IsUpdateAvailable`. The GUI updates that card and shows progress or Error. There is no separate list of every available update. |
 
 ## Deliverables
 

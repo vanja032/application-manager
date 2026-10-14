@@ -35,7 +35,8 @@ bool isBusy(AppAvailability availability)
 {
     return availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
            availability == AppAvailability::Installing || availability == AppAvailability::Updating ||
-           availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling;
+           availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling ||
+           availability == AppAvailability::UpdateQueued || availability == AppAvailability::UpdateDownloading;
 }
 
 QString busyTitle(AppAvailability availability)
@@ -52,6 +53,10 @@ QString busyTitle(AppAvailability availability)
         return QStringLiteral("Queued");
     case AppAvailability::Uninstalling:
         return QStringLiteral("Uninstalling...");
+    case AppAvailability::UpdateQueued:
+        return QStringLiteral("Queued");
+    case AppAvailability::UpdateDownloading:
+        return QStringLiteral("Downloading...");
     default:
         return QStringLiteral("Installing...");
     }
@@ -123,17 +128,31 @@ bool AppCard::retriesUninstall() const
     return m_model.retryUninstall;
 }
 
+bool AppCard::retriesUpdate() const
+{
+    return m_model.retryUpdate;
+}
+
 void AppCard::applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText,
-                           bool retryUninstall)
+                           bool retryUninstall, bool retryUpdate, const QString &installedVersion)
 {
     const bool wasBusy = isBusy(m_model.availability);
     const bool nowBusy = isBusy(availability);
+    if (availability == AppAvailability::NotInstalled)
+    {
+        m_model.installedVersion.clear();
+    }
+    else if (!installedVersion.isEmpty())
+    {
+        m_model.installedVersion = installedVersion;
+    }
     m_model.availability = availability;
     m_model.progressPercent = percent;
     m_model.downloadedMb = downloadedMb;
     m_model.totalMb = totalMb;
     m_model.errorText = errorText;
     m_model.retryUninstall = retryUninstall;
+    m_model.retryUpdate = retryUpdate;
     m_model.hasAvailability = true;
 
     if (wasBusy && nowBusy && m_progress && m_phaseLabel && m_bytesLabel)
@@ -327,10 +346,16 @@ QWidget *AppCard::createActionPanel()
     column->setContentsMargins(0, 0, 0, 0);
     column->setSpacing(8);
 
-    if (m_model.availability == AppAvailability::UpdateAvailable)
+    if (m_model.availability == AppAvailability::UpdateAvailable ||
+        (m_model.availability == AppAvailability::Error && m_model.retryUpdate))
     {
-        column->addWidget(createButton(QStringLiteral("Update"), true));
-        column->addWidget(createButton(QStringLiteral("Uninstall"), false));
+        auto *update = createButton(QStringLiteral("Update"), true);
+        connect(update, &QPushButton::clicked, this, [this]() { emit updateRequested(m_model.packageId); });
+        column->addWidget(update);
+
+        auto *uninstall = createButton(QStringLiteral("Uninstall"), false);
+        connect(uninstall, &QPushButton::clicked, this, [this]() { emit uninstallRequested(m_model.packageId); });
+        column->addWidget(uninstall);
     }
     else if (m_model.availability == AppAvailability::Installed ||
              (m_model.availability == AppAvailability::Error && m_model.retryUninstall))

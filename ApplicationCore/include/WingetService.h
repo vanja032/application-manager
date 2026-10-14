@@ -68,11 +68,18 @@ struct SearchCompletion
 struct InstallCompletion
 {
     std::string error;
+    std::wstring installedVersion;
 };
 
 struct UninstallCompletion
 {
     std::string error;
+};
+
+struct UpdateCompletion
+{
+    std::string error;
+    std::wstring installedVersion;
 };
 
 class WingetService
@@ -84,6 +91,7 @@ class WingetService
     using SearchCallback = std::function<void(SearchCompletion)>;
     using InstallCallback = std::function<void(InstallCompletion)>;
     using UninstallCallback = std::function<void(UninstallCompletion)>;
+    using UpdateCallback = std::function<void(UpdateCompletion)>;
 
     WingetService();
     ~WingetService();
@@ -103,6 +111,7 @@ class WingetService
     void UninstallAppAsync(const std::wstring &packageId, UninstallProgressCallback onProgress, UninstallCallback onComplete);
 
     void UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress = {}) const;
+    void UpdateAppAsync(const std::wstring &packageId, UpdateProgressCallback onProgress, UpdateCallback onComplete);
 
   private:
     struct SearchRequest
@@ -125,13 +134,23 @@ class WingetService
         UninstallCallback onComplete;
     };
 
+    struct UpdateRequest
+    {
+        std::wstring packageId;
+        UpdateProgressCallback onProgress;
+        UpdateCallback onComplete;
+    };
+
     void workerMain();
     void installWorkerMain();
     void uninstallWorkerMain();
-    void installPackage(const std::wstring &packageId, ProgressCallback onProgress,
-                        std::function<void(std::function<void()>)> armCancel) const;
+    void updateWorkerMain();
+    std::wstring installPackage(const std::wstring &packageId, ProgressCallback onProgress,
+                                std::function<void(std::function<void()>)> armCancel) const;
     void uninstallPackage(const std::wstring &packageId, UninstallProgressCallback onProgress,
                           std::function<void(std::function<void()>)> armCancel) const;
+    std::wstring updatePackage(const std::wstring &packageId, UpdateProgressCallback onProgress,
+                               std::function<void(std::function<void()>)> armCancel) const;
 
     std::mutex m_mutex;
     std::condition_variable m_cv;
@@ -152,6 +171,14 @@ class WingetService
     std::wstring m_activeUninstallId;
     std::function<void()> m_cancelUninstall;
 
+    std::mutex m_updateMutex;
+    std::condition_variable m_updateCv;
+    std::deque<UpdateRequest> m_updateQueue;
+    bool m_updateStop = false;
+    std::wstring m_activeUpdateId;
+    std::function<void()> m_cancelUpdate;
+
+    std::thread m_updateWorker;
     std::thread m_uninstallWorker;
     std::thread m_installWorker;
     std::thread m_worker;

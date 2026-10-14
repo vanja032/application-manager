@@ -19,3 +19,5 @@ updated: 2026-10-14
 - 2026-10-14: Install from the GUI calls `InstallAppAsync` on its own Core worker. The card shows Queued, Downloading, Installing, Installed, or Error.
 - 2026-10-14: Uninstall from the GUI calls `UninstallAppAsync` on its own Core worker. The card shows Queued, Uninstalling, Not installed, or Error.
 - 2026-10-14: Search uses a composite `msstore` catalog so `InstalledVersion` is set for packages that are already installed.
+- 2026-10-14: Update from the GUI calls `UpdateAppAsync` on its own Core worker. Search uses `IsUpdateAvailable` to show Update available.
+- 2026-10-14: After install or update, the card version comes from a composite-catalog lookup in the sync install and update path. The remote install package does not fill `InstalledVersion`.

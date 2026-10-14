@@ -36,11 +36,83 @@ struct WorkerApartment
     WorkerApartment &operator=(const WorkerApartment &) = delete;
 };
 
+std::wstring lookupInstalledVersion(const std::wstring &packageId)
+{
+    try
+    {
+        deployment::PackageManager manager;
+        auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+        if (!storeCatalog)
+        {
+            return {};
+        }
+
+        deployment::CreateCompositePackageCatalogOptions compositeOptions;
+        compositeOptions.Catalogs().Append(storeCatalog);
+        compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+        auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+        if (!compositeCatalog)
+        {
+            return {};
+        }
+
+        auto connection = compositeCatalog.Connect();
+        if (connection.Status() != deployment::ConnectResultStatus::Ok)
+        {
+            return {};
+        }
+
+        deployment::FindPackagesOptions options;
+        deployment::PackageMatchFilter filter;
+        filter.Field(deployment::PackageMatchField::Id);
+        filter.Option(deployment::PackageFieldMatchOption::Equals);
+        filter.Value(packageId);
+        options.Selectors().Append(filter);
+
+        auto result = connection.PackageCatalog().FindPackages(options);
+        if (result.Status() != deployment::FindPackagesResultStatus::Ok || result.Matches().Size() == 0)
+        {
+            return {};
+        }
+
+        auto installed = result.Matches().GetAt(0).CatalogPackage().InstalledVersion();
+        if (!installed)
+        {
+            return {};
+        }
+
+        return installed.Version().c_str();
+    }
+    catch (...)
+    {
+        return {};
+    }
+}
+
+std::wstring versionAfterChange(const deployment::CatalogPackage &package, const std::wstring &packageId)
+{
+    std::wstring version = lookupInstalledVersion(packageId);
+    if (!version.empty())
+    {
+        return version;
+    }
+
+    if (auto available = package.DefaultInstallVersion())
+    {
+        return available.Version().c_str();
+    }
+
+    return {};
+}
+
 } // namespace
 
 WingetService::WingetService()
-    : m_uninstallWorker(&WingetService::uninstallWorkerMain, this),
-      m_installWorker(&WingetService::installWorkerMain, this), m_worker(&WingetService::workerMain, this)
+    : m_updateWorker(&WingetService::updateWorkerMain, this),
+      m_uninstallWorker(&WingetService::uninstallWorkerMain, this),
+      m_installWorker(&WingetService::installWorkerMain, this),
+      m_worker(&WingetService::workerMain, this)
 {
 }
 
@@ -83,6 +155,26 @@ WingetService::~WingetService()
     }
 
     m_uninstallCv.notify_all();
+
+    std::function<void()> cancelUpdate;
+    {
+        std::lock_guard lock(m_updateMutex);
+        m_updateStop = true;
+        m_updateQueue.clear();
+        cancelUpdate = std::move(m_cancelUpdate);
+    }
+
+    if (cancelUpdate)
+    {
+        cancelUpdate();
+    }
+
+    m_updateCv.notify_all();
+
+    if (m_updateWorker.joinable())
+    {
+        m_updateWorker.join();
+    }
 
     if (m_uninstallWorker.joinable())
     {
@@ -210,6 +302,12 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
             app.installedVersion = installedVersion.Version().c_str();
         }
 
+        app.updateAvailable = package.IsUpdateAvailable();
+        if (auto availableVersion = package.DefaultInstallVersion())
+        {
+            app.availableVersion = availableVersion.Version().c_str();
+        }
+
         apps.push_back(std::move(app));
     }
 
@@ -280,16 +378,17 @@ void WingetService::installWorkerMain()
         InstallCompletion completion;
         try
         {
-            installPackage(request.packageId, request.onProgress, [this](std::function<void()> cancel) {
-                std::lock_guard lock(m_installMutex);
-                if (m_installStop)
-                {
-                    cancel();
-                    return;
-                }
+            completion.installedVersion = installPackage(
+                request.packageId, request.onProgress, [this](std::function<void()> cancel) {
+                    std::lock_guard lock(m_installMutex);
+                    if (m_installStop)
+                    {
+                        cancel();
+                        return;
+                    }
 
-                m_cancelActive = std::move(cancel);
-            });
+                    m_cancelActive = std::move(cancel);
+                });
         }
         catch (const winrt::hresult_error &ex)
         {
@@ -318,8 +417,8 @@ void WingetService::installWorkerMain()
     }
 }
 
-void WingetService::installPackage(const std::wstring &packageId, ProgressCallback onProgress,
-                                   std::function<void(std::function<void()>)> armCancel) const
+std::wstring WingetService::installPackage(const std::wstring &packageId, ProgressCallback onProgress,
+                                            std::function<void(std::function<void()>)> armCancel) const
 {
     deployment::PackageManager manager;
 
@@ -456,6 +555,8 @@ void WingetService::installPackage(const std::wstring &packageId, ProgressCallba
     {
         onProgress({InstallState::Completed, 100.0});
     }
+
+    return versionAfterChange(package, packageId);
 }
 
 void WingetService::UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress) const
@@ -702,6 +803,111 @@ void WingetService::uninstallPackage(const std::wstring &packageId, UninstallPro
 
 void WingetService::UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress) const
 {
+    updatePackage(packageId, std::move(onProgress), {});
+}
+
+void WingetService::UpdateAppAsync(const std::wstring &packageId, UpdateProgressCallback onProgress,
+                                   UpdateCallback onComplete)
+{
+    {
+        std::lock_guard lock(m_updateMutex);
+        if (m_updateStop || m_activeUpdateId == packageId)
+        {
+            return;
+        }
+
+        for (const UpdateRequest &queued : m_updateQueue)
+        {
+            if (queued.packageId == packageId)
+            {
+                return;
+            }
+        }
+
+        m_updateQueue.push_back(UpdateRequest{packageId, std::move(onProgress), std::move(onComplete)});
+    }
+
+    m_updateCv.notify_one();
+}
+
+void WingetService::updateWorkerMain()
+{
+    const WorkerApartment apartment;
+
+    for (;;)
+    {
+        UpdateRequest request;
+        {
+            std::unique_lock lock(m_updateMutex);
+            m_updateCv.wait(lock, [this] { return m_updateStop || !m_updateQueue.empty(); });
+
+            if (m_updateStop)
+            {
+                return;
+            }
+
+            request = std::move(m_updateQueue.front());
+            m_updateQueue.pop_front();
+            m_activeUpdateId = request.packageId;
+        }
+
+        struct ClearActive
+        {
+            WingetService *self;
+
+            ~ClearActive()
+            {
+                std::lock_guard lock(self->m_updateMutex);
+                self->m_cancelUpdate = nullptr;
+                self->m_activeUpdateId.clear();
+            }
+        } clearActive{this};
+
+        UpdateCompletion completion;
+        try
+        {
+            completion.installedVersion = updatePackage(
+                request.packageId, request.onProgress, [this](std::function<void()> cancel) {
+                    std::lock_guard lock(m_updateMutex);
+                    if (m_updateStop)
+                    {
+                        cancel();
+                        return;
+                    }
+
+                    m_cancelUpdate = std::move(cancel);
+                });
+        }
+        catch (const winrt::hresult_error &ex)
+        {
+            completion.error = winrt::to_string(ex.message());
+        }
+        catch (const std::exception &ex)
+        {
+            completion.error = ex.what();
+        }
+
+        bool stopped = false;
+        {
+            std::lock_guard lock(m_updateMutex);
+            stopped = m_updateStop;
+        }
+
+        if (stopped)
+        {
+            return;
+        }
+
+        if (request.onComplete)
+        {
+            request.onComplete(std::move(completion));
+        }
+    }
+}
+
+std::wstring WingetService::updatePackage(const std::wstring &packageId, UpdateProgressCallback onProgress,
+                                          std::function<void(std::function<void()>)> armCancel) const
+{
     deployment::PackageManager manager;
 
     auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
@@ -756,6 +962,10 @@ void WingetService::UpdateApp(const std::wstring &packageId, UpdateProgressCallb
     updateOptions.AllowUpgradeToUnknownVersion(true);
 
     auto operation = manager.UpgradePackageAsync(package, updateOptions);
+    if (armCancel)
+    {
+        armCancel([operation]() mutable { operation.Cancel(); });
+    }
 
     struct ProgressState
     {
@@ -841,7 +1051,12 @@ void WingetService::UpdateApp(const std::wstring &packageId, UpdateProgressCallb
 
         if (static_cast<uint32_t>(errorCode.value) == WingetErrors::UpdateNotApplicable)
         {
-            return;
+            if (auto installed = package.InstalledVersion())
+            {
+                return installed.Version().c_str();
+            }
+
+            return {};
         }
 
         std::ostringstream message;
@@ -854,4 +1069,6 @@ void WingetService::UpdateApp(const std::wstring &packageId, UpdateProgressCallb
     {
         onProgress({UpdateState::Completed, 100.0});
     }
+
+    return versionAfterChange(package, packageId);
 }
