@@ -106,6 +106,53 @@ std::wstring versionAfterChange(const deployment::CatalogPackage &package, const
     return {};
 }
 
+bool catalogIsStore(const deployment::PackageCatalog &catalog)
+{
+    if (!catalog)
+    {
+        return false;
+    }
+
+    auto info = catalog.Info();
+    if (!info)
+    {
+        return false;
+    }
+
+    return info.Id() == L"msstore" || info.Name() == L"msstore" || info.Argument() == L"msstore";
+}
+
+bool versionIsStore(const deployment::PackageVersionInfo &version)
+{
+    return version && catalogIsStore(version.PackageCatalog());
+}
+
+bool isMicrosoftStorePackage(const deployment::CatalogPackage &package)
+{
+    return versionIsStore(package.DefaultInstallVersion()) || versionIsStore(package.InstalledVersion());
+}
+
+AppInfo appFromPackage(const deployment::CatalogPackage &package)
+{
+    AppInfo app;
+    app.id = package.Id().c_str();
+    app.name = package.Name().c_str();
+
+    if (auto installedVersion = package.InstalledVersion())
+    {
+        app.installed = true;
+        app.installedVersion = installedVersion.Version().c_str();
+    }
+
+    app.updateAvailable = package.IsUpdateAvailable();
+    if (auto availableVersion = package.DefaultInstallVersion())
+    {
+        app.availableVersion = availableVersion.Version().c_str();
+    }
+
+    return app;
+}
+
 } // namespace
 
 WingetService::WingetService()
@@ -215,7 +262,18 @@ void WingetService::workerMain()
         SearchCompletion completion;
         try
         {
-            completion.apps = SearchApps(request.query);
+            if (request.kind == CatalogRequest::Installed)
+            {
+                completion.apps = ListInstalledApps();
+            }
+            else if (request.kind == CatalogRequest::Updates)
+            {
+                completion.apps = ListUpdates();
+            }
+            else
+            {
+                completion.apps = SearchApps(request.query);
+            }
         }
         catch (const winrt::hresult_error &ex)
         {
@@ -237,7 +295,7 @@ void WingetService::SearchAppsAsync(const std::wstring &query, SearchCallback ca
 {
     {
         std::lock_guard lock(m_mutex);
-        m_pending = SearchRequest{query, std::move(callback)};
+        m_pending = SearchRequest{CatalogRequest::Search, query, std::move(callback)};
     }
 
     m_cv.notify_one();
@@ -290,22 +348,88 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
 
     for (const auto &match : result.Matches())
     {
+        apps.push_back(appFromPackage(match.CatalogPackage()));
+    }
+
+    return apps;
+}
+
+std::vector<AppInfo> WingetService::ListInstalledApps() const
+{
+    return listStorePackages(false);
+}
+
+void WingetService::ListInstalledAppsAsync(SearchCallback callback)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_pending = SearchRequest{CatalogRequest::Installed, {}, std::move(callback)};
+    }
+
+    m_cv.notify_one();
+}
+
+std::vector<AppInfo> WingetService::ListUpdates() const
+{
+    return listStorePackages(true);
+}
+
+void WingetService::ListUpdatesAsync(SearchCallback callback)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_pending = SearchRequest{CatalogRequest::Updates, {}, std::move(callback)};
+    }
+
+    m_cv.notify_one();
+}
+
+std::vector<AppInfo> WingetService::listStorePackages(bool updatesOnly) const
+{
+    deployment::PackageManager manager;
+
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
+    {
+        throw std::runtime_error("msstore catalog not found");
+    }
+
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::LocalCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
+    if (connection.Status() != deployment::ConnectResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to connect to composite catalog");
+    }
+
+    deployment::FindPackagesOptions options;
+    auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to list installed packages");
+    }
+
+    std::vector<AppInfo> apps;
+    for (const auto &match : result.Matches())
+    {
         auto package = match.CatalogPackage();
-
-        AppInfo app;
-        app.id = package.Id().c_str();
-        app.name = package.Name().c_str();
-
-        if (auto installedVersion = package.InstalledVersion())
+        if (!package.InstalledVersion() || !isMicrosoftStorePackage(package))
         {
-            app.installed = true;
-            app.installedVersion = installedVersion.Version().c_str();
+            continue;
         }
 
-        app.updateAvailable = package.IsUpdateAvailable();
-        if (auto availableVersion = package.DefaultInstallVersion())
+        AppInfo app = appFromPackage(package);
+        if (updatesOnly && !app.updateAvailable)
         {
-            app.availableVersion = availableVersion.Version().c_str();
+            continue;
         }
 
         apps.push_back(std::move(app));

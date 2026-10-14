@@ -104,6 +104,12 @@ class WingetService
     std::vector<AppInfo> SearchApps(const std::wstring &query) const;
     void SearchAppsAsync(const std::wstring &query, SearchCallback callback);
 
+    std::vector<AppInfo> ListInstalledApps() const;
+    void ListInstalledAppsAsync(SearchCallback callback);
+
+    std::vector<AppInfo> ListUpdates() const;
+    void ListUpdatesAsync(SearchCallback callback);
+
     void InstallApp(const std::wstring &packageId, ProgressCallback onProgress = {}) const;
     void InstallAppAsync(const std::wstring &packageId, ProgressCallback onProgress, InstallCallback onComplete);
 
@@ -114,8 +120,16 @@ class WingetService
     void UpdateAppAsync(const std::wstring &packageId, UpdateProgressCallback onProgress, UpdateCallback onComplete);
 
   private:
+    enum class CatalogRequest
+    {
+        Search,
+        Installed,
+        Updates
+    };
+
     struct SearchRequest
     {
+        CatalogRequest kind = CatalogRequest::Search;
         std::wstring query;
         SearchCallback callback;
     };
@@ -142,6 +156,7 @@ class WingetService
     };
 
     void workerMain();
+    std::vector<AppInfo> listStorePackages(bool updatesOnly) const;
     void installWorkerMain();
     void uninstallWorkerMain();
     void updateWorkerMain();

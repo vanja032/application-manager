@@ -55,6 +55,8 @@ class MainWindow : public QMainWindow
     void applyTheme(bool dark);
     void showSection(Section section);
     void startSearch();
+    void startInstalledList();
+    void startUpdatesList();
     void startInstall(const QString &packageId);
     void startUninstall(const QString &packageId);
     void startUpdate(const QString &packageId);
@@ -68,6 +70,7 @@ class MainWindow : public QMainWindow
     void refreshAppList();
     void positionUpdatesBadge();
     bool cardMatches(const AppCard *card) const;
+    QString emptyListMessage() const;
 
     Ui::MainWindowClass ui;
     QButtonGroup *m_navGroup = nullptr;
@@ -79,6 +82,8 @@ class MainWindow : public QMainWindow
     QLabel *m_updatesBadge = nullptr;
     std::vector<AppCard *> m_cards;
     Section m_section = Section::Discover;
+    Section m_loadedSection = Section::Discover;
+    bool m_listLoaded = false;
     bool m_darkMode = false;
     struct InstallUiState
     {

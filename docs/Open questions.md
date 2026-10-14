@@ -10,8 +10,8 @@ updated: 2026-10-14
 
 Progress against the assessment is tracked in [[Production goal]]. The items below are the gaps that still block that bar.
 
-- Install calls `InstallAppAsync`. Uninstall calls `UninstallAppAsync`. Update calls `UpdateAppAsync`. There is still no list of every installed app or every available update.
-- The live list must report Available, Installing, Installed, and Error for tracked apps. Search results now show catalog install state, and an install reports Queued, Downloading, Installing, Installed, or Error. There is still no list of every installed app.
+- Install calls `InstallAppAsync`. Uninstall calls `UninstallAppAsync`. Update calls `UpdateAppAsync`. Installed opens `ListInstalledAppsAsync`. Updates opens `ListUpdatesAsync`.
+- The live list must report Available, Installing, Installed, and Error for tracked apps. Search results and the Installed section show catalog install state, and an install reports Queued, Downloading, Installing, Installed, or Error.
 - There is no action to launch an installed Microsoft Store application from the UI.
 - `AppInfo` carries id, name, install state, and whether an update is available. Source is still not on that model. The card keeps install, uninstall, and update progress locally.
 - The GUI no longer ships a mock catalog. Search results come from `msstore` only.

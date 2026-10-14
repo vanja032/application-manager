@@ -14,6 +14,7 @@ updated: 2026-10-14
 
 - `SearchApps(query)` returns `std::vector<AppInfo>` and blocks until the search finishes. [[WingetPoC]] still uses this.
 - `SearchAppsAsync(query, callback)` returns immediately. A Core-owned worker thread calls `winrt::init_apartment` and runs `SearchApps`. The callback receives a `SearchCompletion` with `apps` or `error`. The worker is joined in the destructor. A newer request replaces one that has not started.
+- `ListInstalledApps` and `ListUpdates` block until the local `msstore` list is ready. `ListInstalledAppsAsync` and `ListUpdatesAsync` use the search worker and the same `SearchCompletion`. A new search or list replaces a request that has not started.
 - `InstallApp(packageId, onProgress)` blocks until install finishes. [[WingetPoC]] still uses this.
 - `InstallAppAsync(packageId, onProgress, onComplete)` returns immediately. A second Core worker, separate from search, runs installs one at a time. Progress uses the same `InstallProgressInfo` values as the synchronous method. `onComplete` receives an `InstallCompletion` whose `error` is empty on success and whose `installedVersion` is the version just installed. A second request for a package that is already queued or running is ignored. Closing the service cancels the active WinRT operation and joins the worker.
 - `UninstallApp(packageId, onProgress)` blocks until uninstall finishes. [[WingetPoC]] still uses this.
@@ -38,6 +39,8 @@ The callback is not invoked on every WinRT tick. It fires only when the state ad
 Search builds a composite catalog from `msstore`, with behavior `RemotePackagesFromAllCatalogs`, then `Connect`. The remote `msstore` catalog alone does not fill `InstalledVersion`, so a package that is already installed looked not installed. The name filter uses ContainsCaseInsensitive and is added to `Filters`, with `ResultLimit` 10. The query is sent as typed. The catalog drops very common English words before lookup, so a query such as `what` can return nothing even when a package name contains those letters. See [[Store search]]. `Selectors` would resolve a single package, which is why search previously returned one hit. Each match becomes an `AppInfo` with the catalog package `Id`, `Name`, and `InstalledVersion` when the composite catalog has one.
 
 If the catalog is missing, the connection is not Ok, or the search is not Ok, the method throws `std::runtime_error`.
+
+`ListInstalledApps` and `ListUpdates` use the same composite catalog with behavior `LocalCatalogs`, and `FindPackages` with no selectors. That reads the installed packages instead of the remote name index. A package is kept when it has `InstalledVersion` and belongs to `msstore`. `ListUpdates` keeps only those with `IsUpdateAvailable`. Both have async methods on the search worker. The callback is the same `SearchCompletion`.
 
 ## Install and uninstall
 

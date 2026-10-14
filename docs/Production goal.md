@@ -33,7 +33,7 @@ A C++ Windows desktop application that behaves like the Microsoft Store. The GUI
 | Requirement | Status |
 | --- | --- |
 | Experience similar to the Microsoft Store for managing desktop software | Partial. Search shows live `msstore` results. Install, update, and uninstall are not wired. |
-| Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Partial. Search cards show Not installed or Installed from the catalog. An install moves through Queued, Downloading, Installing, Installed, or Error. This is not yet a list of every installed app. |
+| Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Partial. Discover searches the catalog. Installed lists installed Microsoft Store packages. An operation moves through Queued, Downloading, Installing or Updating, Installed, or Error. |
 | Search, inspect, and install applications from the Microsoft Store source | Partial. The GUI searches and installs through Core. The card shows install progress and Error. There is no separate inspect view. |
 
 ### 2. Technology choice
@@ -58,8 +58,8 @@ These are in scope for the finished application.
 | Feature | Status |
 | --- | --- |
 | Launch an installed Microsoft Store app from the UI | Not met. |
-| Uninstall from the application | Partial. The GUI uninstalls a search result that is already installed and shows progress or Error. There is no separate list of every installed app. |
-| Detect available updates and apply them | Partial. Search marks `IsUpdateAvailable`. The GUI updates that card and shows progress or Error. There is no separate list of every available update. |
+| Uninstall from the application | Partial. The GUI uninstalls an installed Microsoft Store package and shows progress or Error. |
+| Detect available updates and apply them | Partial. Updates lists packages with `IsUpdateAvailable`. The GUI updates that card and shows progress or Error. |
 
 ## Deliverables
 

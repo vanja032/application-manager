@@ -167,8 +167,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(ui.searchEdit, &QLineEdit::returnPressed, this, [this]() { startSearch(); });
     connect(ui.sourceCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
     connect(ui.sortCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
-
-    startSearch();
 }
 
 MainWindow::~MainWindow() = default;
@@ -379,8 +377,12 @@ void MainWindow::applyTheme(bool dark)
 void MainWindow::showSection(Section section)
 {
     m_section = section;
-    const bool showList = section == Section::Discover || section == Section::Installed || section == Section::Updates;
-    ui.searchRow->setVisible(showList);
+    const bool discover = section == Section::Discover;
+    const bool showList = discover || section == Section::Installed || section == Section::Updates;
+    ui.searchRow->setVisible(discover);
+    ui.filterAllButton->setVisible(discover);
+    ui.filterInstalledButton->setVisible(discover);
+    ui.filterNotInstalledButton->setVisible(discover);
     ui.filterRow->setVisible(showList);
 
     if (section == Section::Settings)
@@ -395,7 +397,30 @@ void MainWindow::showSection(Section section)
     }
 
     ui.pages->setCurrentWidget(ui.pageList);
-    refreshAppList();
+    if (m_listLoaded && m_loadedSection == section)
+    {
+        refreshAppList();
+        return;
+    }
+
+    if (section == Section::Installed)
+    {
+        startInstalledList();
+    }
+    else if (section == Section::Updates)
+    {
+        startUpdatesList();
+    }
+    else if (!ui.searchEdit->text().trimmed().isEmpty())
+    {
+        startSearch();
+    }
+    else
+    {
+        m_loadedSection = Section::Discover;
+        m_listLoaded = true;
+        showStatus(QStringLiteral("No applications match your search."));
+    }
 }
 
 void MainWindow::startSearch()
@@ -404,10 +429,13 @@ void MainWindow::startSearch()
     const QString query = ui.searchEdit->text().trimmed();
     if (query.isEmpty())
     {
+        m_loadedSection = Section::Discover;
+        m_listLoaded = true;
         showStatus(QStringLiteral("No applications match your search."));
         return;
     }
 
+    m_listLoaded = false;
     showStatus(QStringLiteral("Searching..."));
 
     m_service.SearchAppsAsync(query.toStdWString(), [this, generation](SearchCompletion completion) {
@@ -425,8 +453,85 @@ void MainWindow::startSearch()
     });
 }
 
+void MainWindow::startInstalledList()
+{
+    const std::uint64_t generation = ++m_searchGeneration;
+    m_listLoaded = false;
+    showStatus(QStringLiteral("Loading installed applications..."));
+
+    m_service.ListInstalledAppsAsync([this, generation](SearchCompletion completion) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, generation, completion]() {
+                if (generation != m_searchGeneration)
+                {
+                    return;
+                }
+
+                applySearchCompletion(completion);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void MainWindow::startUpdatesList()
+{
+    const std::uint64_t generation = ++m_searchGeneration;
+    m_listLoaded = false;
+    showStatus(QStringLiteral("Checking for updates..."));
+
+    m_service.ListUpdatesAsync([this, generation](SearchCompletion completion) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, generation, completion]() {
+                if (generation != m_searchGeneration)
+                {
+                    return;
+                }
+
+                applySearchCompletion(completion);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
 namespace
 {
+
+bool isInstalledCard(const AppCard *card)
+{
+    switch (card->availability())
+    {
+    case AppAvailability::Installed:
+    case AppAvailability::UpdateAvailable:
+    case AppAvailability::UninstallQueued:
+    case AppAvailability::Uninstalling:
+    case AppAvailability::UpdateQueued:
+    case AppAvailability::UpdateDownloading:
+    case AppAvailability::Updating:
+        return true;
+    case AppAvailability::Error:
+        return card->retriesUninstall() || card->retriesUpdate();
+    default:
+        return false;
+    }
+}
+
+bool isUpdateCard(const AppCard *card)
+{
+    switch (card->availability())
+    {
+    case AppAvailability::UpdateAvailable:
+    case AppAvailability::UpdateQueued:
+    case AppAvailability::UpdateDownloading:
+    case AppAvailability::Updating:
+        return true;
+    case AppAvailability::Error:
+        return card->retriesUpdate();
+    default:
+        return false;
+    }
+}
 
 bool isPackageBusy(AppAvailability availability)
 {
@@ -691,6 +796,9 @@ void MainWindow::clearCards()
 
 void MainWindow::applySearchCompletion(const SearchCompletion &completion)
 {
+    m_loadedSection = m_section;
+    m_listLoaded = completion.error.empty();
+
     if (!completion.error.empty())
     {
         showStatus(QString::fromStdString(completion.error));
@@ -751,7 +859,7 @@ void MainWindow::applySearchCompletion(const SearchCompletion &completion)
 
     if (m_cards.empty())
     {
-        showStatus(QStringLiteral("No applications match your search."));
+        showStatus(emptyListMessage());
         return;
     }
 
@@ -762,8 +870,7 @@ void MainWindow::refreshAppList()
 {
     if (m_cards.empty())
     {
-        ui.emptyStateLabel->setText(m_statusText.isEmpty() ? QStringLiteral("No applications match your search.")
-                                                            : m_statusText);
+        ui.emptyStateLabel->setText(emptyListMessage());
         ui.emptyStateLabel->setVisible(true);
         ui.appScrollArea->setVisible(false);
         return;
@@ -816,7 +923,7 @@ void MainWindow::refreshAppList()
 
     if (!anyVisible)
     {
-        ui.emptyStateLabel->setText(QStringLiteral("No applications match your search."));
+        ui.emptyStateLabel->setText(emptyListMessage());
     }
     ui.emptyStateLabel->setVisible(!anyVisible);
     ui.appScrollArea->setVisible(anyVisible);
@@ -825,37 +932,28 @@ void MainWindow::refreshAppList()
 
 bool MainWindow::cardMatches(const AppCard *card) const
 {
-    if (!card->hasAvailability())
+    if (m_section == Section::Discover)
     {
-        if (m_section != Section::Discover)
+        const int filter = m_filterGroup->checkedId();
+        if (filter == static_cast<int>(StatusFilter::Installed) && !isInstalledCard(card))
+        {
+            return false;
+        }
+        if (filter == static_cast<int>(StatusFilter::NotInstalled) && isInstalledCard(card))
         {
             return false;
         }
     }
     else if (m_section == Section::Installed)
     {
-        const AppAvailability availability = card->availability();
-        const bool removing =
-            availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling;
-        const bool updating = availability == AppAvailability::UpdateQueued ||
-                              availability == AppAvailability::UpdateDownloading ||
-                              availability == AppAvailability::Updating;
-        const bool failedRemoval = availability == AppAvailability::Error && card->retriesUninstall();
-        const bool failedUpdate = availability == AppAvailability::Error && card->retriesUpdate();
-        if (availability != AppAvailability::Installed && availability != AppAvailability::UpdateAvailable && !removing &&
-            !updating && !failedRemoval && !failedUpdate)
+        if (!isInstalledCard(card))
         {
             return false;
         }
     }
     else if (m_section == Section::Updates)
     {
-        const AppAvailability availability = card->availability();
-        const bool updating = availability == AppAvailability::UpdateQueued ||
-                              availability == AppAvailability::UpdateDownloading ||
-                              availability == AppAvailability::Updating;
-        const bool failedUpdate = availability == AppAvailability::Error && card->retriesUpdate();
-        if (availability != AppAvailability::UpdateAvailable && !updating && !failedUpdate)
+        if (!isUpdateCard(card))
         {
             return false;
         }
@@ -867,6 +965,11 @@ bool MainWindow::cardMatches(const AppCard *card) const
         return false;
     }
 
+    if (m_section != Section::Discover)
+    {
+        return true;
+    }
+
     const QString query = ui.searchEdit->text().trimmed();
     if (query.isEmpty())
     {
@@ -874,6 +977,33 @@ bool MainWindow::cardMatches(const AppCard *card) const
     }
 
     return card->name().contains(query, Qt::CaseInsensitive) || card->packageId().contains(query, Qt::CaseInsensitive);
+}
+
+QString MainWindow::emptyListMessage() const
+{
+    if (!m_statusText.isEmpty() && m_cards.empty())
+    {
+        return m_statusText;
+    }
+
+    if (m_section == Section::Installed)
+    {
+        return QStringLiteral("No installed applications.");
+    }
+    if (m_section == Section::Updates)
+    {
+        return QStringLiteral("No updates available.");
+    }
+    if (m_filterGroup->checkedId() == static_cast<int>(StatusFilter::Installed))
+    {
+        return QStringLiteral("No installed applications match your search.");
+    }
+    if (m_filterGroup->checkedId() == static_cast<int>(StatusFilter::NotInstalled))
+    {
+        return QStringLiteral("No applications to install match your search.");
+    }
+
+    return QStringLiteral("No applications match your search.");
 }
 
 void MainWindow::positionUpdatesBadge()
