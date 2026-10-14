@@ -435,7 +435,8 @@ void MainWindow::startInstall(const QString &packageId)
 
     const AppAvailability availability = card->availability();
     if (availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
-        availability == AppAvailability::Installing || availability == AppAvailability::Updating)
+        availability == AppAvailability::Installing || availability == AppAvailability::Updating ||
+        availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling)
     {
         return;
     }
@@ -486,8 +487,65 @@ void MainWindow::startInstall(const QString &packageId)
         });
 }
 
+void MainWindow::startUninstall(const QString &packageId)
+{
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return;
+    }
+
+    const AppAvailability availability = card->availability();
+    if (availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+        availability == AppAvailability::Installing || availability == AppAvailability::Updating ||
+        availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling)
+    {
+        return;
+    }
+
+    showPackageStatus(packageId, AppAvailability::UninstallQueued, 0, 0, 0, QString());
+
+    m_service.UninstallAppAsync(
+        packageId.toStdWString(),
+        [this, packageId](const UninstallProgressInfo &info) {
+            const int percent = static_cast<int>(info.percent);
+            QMetaObject::invokeMethod(
+                this,
+                [this, packageId, info, percent]() {
+                    switch (info.state)
+                    {
+                    case UninstallState::Queued:
+                        showPackageStatus(packageId, AppAvailability::UninstallQueued, 0, 0, 0, QString());
+                        break;
+                    case UninstallState::Uninstalling:
+                        showPackageStatus(packageId, AppAvailability::Uninstalling, percent, 0, 0, QString());
+                        break;
+                    case UninstallState::Completed:
+                        showPackageStatus(packageId, AppAvailability::NotInstalled, 0, 0, 0, QString());
+                        break;
+                    }
+                },
+                Qt::QueuedConnection);
+        },
+        [this, packageId](UninstallCompletion completion) {
+            QMetaObject::invokeMethod(
+                this,
+                [this, packageId, completion]() {
+                    if (!completion.error.empty())
+                    {
+                        showPackageStatus(packageId, AppAvailability::Error, 0, 0, 0,
+                                          QString::fromStdString(completion.error), true);
+                        return;
+                    }
+
+                    showPackageStatus(packageId, AppAvailability::NotInstalled, 0, 0, 0, QString());
+                },
+                Qt::QueuedConnection);
+        });
+}
+
 void MainWindow::showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
-                                   int totalMb, const QString &errorText)
+                                   int totalMb, const QString &errorText, bool retryUninstall)
 {
     InstallUiState &state = m_installUi[packageId];
     const AppAvailability previous = state.availability;
@@ -496,6 +554,7 @@ void MainWindow::showPackageStatus(const QString &packageId, AppAvailability ava
     state.downloadedMb = downloadedMb;
     state.totalMb = totalMb;
     state.error = errorText;
+    state.retryUninstall = retryUninstall;
 
     AppCard *card = findCard(packageId);
     if (!card)
@@ -503,7 +562,7 @@ void MainWindow::showPackageStatus(const QString &packageId, AppAvailability ava
         return;
     }
 
-    card->applyStatus(availability, percent, downloadedMb, totalMb, errorText);
+    card->applyStatus(availability, percent, downloadedMb, totalMb, errorText, retryUninstall);
     if (previous != availability)
     {
         refreshAppList();
@@ -574,12 +633,14 @@ void MainWindow::applySearchCompletion(const SearchCompletion &completion)
             model.downloadedMb = saved->downloadedMb;
             model.totalMb = saved->totalMb;
             model.errorText = saved->error;
+            model.retryUninstall = saved->retryUninstall;
         }
 
         auto *card = new AppCard(model, ui.appListContainer);
         card->setDarkMode(m_darkMode);
         card->hide();
         connect(card, &AppCard::installRequested, this, &MainWindow::startInstall, Qt::QueuedConnection);
+        connect(card, &AppCard::uninstallRequested, this, &MainWindow::startUninstall, Qt::QueuedConnection);
         m_cards.push_back(card);
     }
 
@@ -669,7 +730,11 @@ bool MainWindow::cardMatches(const AppCard *card) const
     else if (m_section == Section::Installed)
     {
         const AppAvailability availability = card->availability();
-        if (availability != AppAvailability::Installed && availability != AppAvailability::UpdateAvailable)
+        const bool removing =
+            availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling;
+        const bool failedRemoval = availability == AppAvailability::Error && card->retriesUninstall();
+        if (availability != AppAvailability::Installed && availability != AppAvailability::UpdateAvailable && !removing &&
+            !failedRemoval)
         {
             return false;
         }

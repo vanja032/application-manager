@@ -39,7 +39,8 @@ struct WorkerApartment
 } // namespace
 
 WingetService::WingetService()
-    : m_installWorker(&WingetService::installWorkerMain, this), m_worker(&WingetService::workerMain, this)
+    : m_uninstallWorker(&WingetService::uninstallWorkerMain, this),
+      m_installWorker(&WingetService::installWorkerMain, this), m_worker(&WingetService::workerMain, this)
 {
 }
 
@@ -67,6 +68,26 @@ WingetService::~WingetService()
     }
 
     m_installCv.notify_all();
+
+    std::function<void()> cancelUninstall;
+    {
+        std::lock_guard lock(m_uninstallMutex);
+        m_uninstallStop = true;
+        m_uninstallQueue.clear();
+        cancelUninstall = std::move(m_cancelUninstall);
+    }
+
+    if (cancelUninstall)
+    {
+        cancelUninstall();
+    }
+
+    m_uninstallCv.notify_all();
+
+    if (m_uninstallWorker.joinable())
+    {
+        m_uninstallWorker.join();
+    }
 
     if (m_installWorker.joinable())
     {
@@ -134,16 +155,26 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
 {
     deployment::PackageManager manager;
 
-    auto catalog = manager.GetPackageCatalogByName(L"msstore");
-    if (!catalog)
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
     {
         throw std::runtime_error("msstore catalog not found");
     }
 
-    auto connection = catalog.Connect();
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
     if (connection.Status() != deployment::ConnectResultStatus::Ok)
     {
-        throw std::runtime_error("Failed to connect to msstore");
+        throw std::runtime_error("Failed to connect to composite catalog");
     }
 
     deployment::FindPackagesOptions options;
@@ -429,6 +460,110 @@ void WingetService::installPackage(const std::wstring &packageId, ProgressCallba
 
 void WingetService::UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress) const
 {
+    uninstallPackage(packageId, std::move(onProgress), {});
+}
+
+void WingetService::UninstallAppAsync(const std::wstring &packageId, UninstallProgressCallback onProgress,
+                                      UninstallCallback onComplete)
+{
+    {
+        std::lock_guard lock(m_uninstallMutex);
+        if (m_uninstallStop || m_activeUninstallId == packageId)
+        {
+            return;
+        }
+
+        for (const UninstallRequest &queued : m_uninstallQueue)
+        {
+            if (queued.packageId == packageId)
+            {
+                return;
+            }
+        }
+
+        m_uninstallQueue.push_back(UninstallRequest{packageId, std::move(onProgress), std::move(onComplete)});
+    }
+
+    m_uninstallCv.notify_one();
+}
+
+void WingetService::uninstallWorkerMain()
+{
+    const WorkerApartment apartment;
+
+    for (;;)
+    {
+        UninstallRequest request;
+        {
+            std::unique_lock lock(m_uninstallMutex);
+            m_uninstallCv.wait(lock, [this] { return m_uninstallStop || !m_uninstallQueue.empty(); });
+
+            if (m_uninstallStop)
+            {
+                return;
+            }
+
+            request = std::move(m_uninstallQueue.front());
+            m_uninstallQueue.pop_front();
+            m_activeUninstallId = request.packageId;
+        }
+
+        struct ClearActive
+        {
+            WingetService *self;
+
+            ~ClearActive()
+            {
+                std::lock_guard lock(self->m_uninstallMutex);
+                self->m_cancelUninstall = nullptr;
+                self->m_activeUninstallId.clear();
+            }
+        } clearActive{this};
+
+        UninstallCompletion completion;
+        try
+        {
+            uninstallPackage(request.packageId, request.onProgress, [this](std::function<void()> cancel) {
+                std::lock_guard lock(m_uninstallMutex);
+                if (m_uninstallStop)
+                {
+                    cancel();
+                    return;
+                }
+
+                m_cancelUninstall = std::move(cancel);
+            });
+        }
+        catch (const winrt::hresult_error &ex)
+        {
+            completion.error = winrt::to_string(ex.message());
+        }
+        catch (const std::exception &ex)
+        {
+            completion.error = ex.what();
+        }
+
+        bool stopped = false;
+        {
+            std::lock_guard lock(m_uninstallMutex);
+            stopped = m_uninstallStop;
+        }
+
+        if (stopped)
+        {
+            return;
+        }
+
+        if (request.onComplete)
+        {
+            request.onComplete(std::move(completion));
+        }
+    }
+}
+
+void WingetService::uninstallPackage(const std::wstring &packageId, UninstallProgressCallback onProgress,
+                                     std::function<void(std::function<void()>)> armCancel) const
+{
     deployment::PackageManager manager;
 
     auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
@@ -481,6 +616,10 @@ void WingetService::UninstallApp(const std::wstring &packageId, UninstallProgres
 
     deployment::UninstallOptions uninstallOptions;
     auto operation = manager.UninstallPackageAsync(package, uninstallOptions);
+    if (armCancel)
+    {
+        armCancel([operation]() mutable { operation.Cancel(); });
+    }
 
     struct ProgressState
     {

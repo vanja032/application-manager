@@ -56,8 +56,9 @@ class MainWindow : public QMainWindow
     void showSection(Section section);
     void startSearch();
     void startInstall(const QString &packageId);
+    void startUninstall(const QString &packageId);
     void showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
-                           int totalMb, const QString &errorText);
+                           int totalMb, const QString &errorText, bool retryUninstall = false);
     AppCard *findCard(const QString &packageId) const;
     void showStatus(const QString &text);
     void clearCards();
@@ -84,6 +85,7 @@ class MainWindow : public QMainWindow
         int downloadedMb = 0;
         int totalMb = 0;
         QString error;
+        bool retryUninstall = false;
     };
 
     std::uint64_t m_searchGeneration = 0;

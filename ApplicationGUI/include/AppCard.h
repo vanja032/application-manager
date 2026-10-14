@@ -12,6 +12,8 @@ enum class AppAvailability
     Downloading,
     Installing,
     Updating,
+    UninstallQueued,
+    Uninstalling,
     Error
 };
 
@@ -29,6 +31,7 @@ struct AppCardModel
     int catalogIndex = 0;
     bool hasAvailability = false;
     QString errorText;
+    bool retryUninstall = false;
 };
 
 class CircularProgress;
@@ -50,11 +53,15 @@ class AppCard : public QWidget
     bool hasAvailability() const;
     int catalogIndex() const;
 
-    void applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText);
+    bool retriesUninstall() const;
+
+    void applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText,
+                     bool retryUninstall = false);
     void setDarkMode(bool dark);
 
   signals:
     void installRequested(const QString &packageId);
+    void uninstallRequested(const QString &packageId);
 
   protected:
     void paintEvent(QPaintEvent *event) override;

@@ -70,6 +70,11 @@ struct InstallCompletion
     std::string error;
 };
 
+struct UninstallCompletion
+{
+    std::string error;
+};
+
 class WingetService
 {
   public:
@@ -78,6 +83,7 @@ class WingetService
     using UpdateProgressCallback = std::function<void(const UpdateProgressInfo &)>;
     using SearchCallback = std::function<void(SearchCompletion)>;
     using InstallCallback = std::function<void(InstallCompletion)>;
+    using UninstallCallback = std::function<void(UninstallCompletion)>;
 
     WingetService();
     ~WingetService();
@@ -94,6 +100,7 @@ class WingetService
     void InstallAppAsync(const std::wstring &packageId, ProgressCallback onProgress, InstallCallback onComplete);
 
     void UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress = {}) const;
+    void UninstallAppAsync(const std::wstring &packageId, UninstallProgressCallback onProgress, UninstallCallback onComplete);
 
     void UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress = {}) const;
 
@@ -111,10 +118,20 @@ class WingetService
         InstallCallback onComplete;
     };
 
+    struct UninstallRequest
+    {
+        std::wstring packageId;
+        UninstallProgressCallback onProgress;
+        UninstallCallback onComplete;
+    };
+
     void workerMain();
     void installWorkerMain();
+    void uninstallWorkerMain();
     void installPackage(const std::wstring &packageId, ProgressCallback onProgress,
                         std::function<void(std::function<void()>)> armCancel) const;
+    void uninstallPackage(const std::wstring &packageId, UninstallProgressCallback onProgress,
+                          std::function<void(std::function<void()>)> armCancel) const;
 
     std::mutex m_mutex;
     std::condition_variable m_cv;
@@ -127,6 +144,15 @@ class WingetService
     bool m_installStop = false;
     std::wstring m_activeInstallId;
     std::function<void()> m_cancelActive;
+
+    std::mutex m_uninstallMutex;
+    std::condition_variable m_uninstallCv;
+    std::deque<UninstallRequest> m_uninstallQueue;
+    bool m_uninstallStop = false;
+    std::wstring m_activeUninstallId;
+    std::function<void()> m_cancelUninstall;
+
+    std::thread m_uninstallWorker;
     std::thread m_installWorker;
     std::thread m_worker;
 };

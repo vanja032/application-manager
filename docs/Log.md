@@ -17,3 +17,5 @@ updated: 2026-10-14
 - 2026-10-14: Recorded how `msstore` drops common words, and the search advantages still open versus that index. See [[Store search]].
 - 2026-10-14: All, Installed, and Not installed stay visible and do not filter search cards until install status exists.
 - 2026-10-14: Install from the GUI calls `InstallAppAsync` on its own Core worker. The card shows Queued, Downloading, Installing, Installed, or Error.
+- 2026-10-14: Uninstall from the GUI calls `UninstallAppAsync` on its own Core worker. The card shows Queued, Uninstalling, Not installed, or Error.
+- 2026-10-14: Search uses a composite `msstore` catalog so `InstalledVersion` is set for packages that are already installed.

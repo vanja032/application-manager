@@ -20,4 +20,4 @@ struct AppInfo
 };
 ```
 
-Search fills `installed` from the catalog package `InstalledVersion`. A null version means the package is not installed. Progress during install is not stored here. The GUI keeps that on the card.
+Search fills `installed` from `InstalledVersion` on the composite `msstore` catalog. The remote catalog alone leaves that property empty, so an installed package would look available. A null version means the package is not installed. Progress during install is not stored here. The GUI keeps that on the card.

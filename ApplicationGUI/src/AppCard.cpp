@@ -34,7 +34,8 @@ QString versionText(const QString &prefix, const QString &version)
 bool isBusy(AppAvailability availability)
 {
     return availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
-           availability == AppAvailability::Installing || availability == AppAvailability::Updating;
+           availability == AppAvailability::Installing || availability == AppAvailability::Updating ||
+           availability == AppAvailability::UninstallQueued || availability == AppAvailability::Uninstalling;
 }
 
 QString busyTitle(AppAvailability availability)
@@ -47,6 +48,10 @@ QString busyTitle(AppAvailability availability)
         return QStringLiteral("Downloading...");
     case AppAvailability::Updating:
         return QStringLiteral("Updating...");
+    case AppAvailability::UninstallQueued:
+        return QStringLiteral("Queued");
+    case AppAvailability::Uninstalling:
+        return QStringLiteral("Uninstalling...");
     default:
         return QStringLiteral("Installing...");
     }
@@ -113,7 +118,13 @@ int AppCard::catalogIndex() const
     return m_model.catalogIndex;
 }
 
-void AppCard::applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText)
+bool AppCard::retriesUninstall() const
+{
+    return m_model.retryUninstall;
+}
+
+void AppCard::applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText,
+                           bool retryUninstall)
 {
     const bool wasBusy = isBusy(m_model.availability);
     const bool nowBusy = isBusy(availability);
@@ -122,6 +133,7 @@ void AppCard::applyStatus(AppAvailability availability, int percent, int downloa
     m_model.downloadedMb = downloadedMb;
     m_model.totalMb = totalMb;
     m_model.errorText = errorText;
+    m_model.retryUninstall = retryUninstall;
     m_model.hasAvailability = true;
 
     if (wasBusy && nowBusy && m_progress && m_phaseLabel && m_bytesLabel)
@@ -319,6 +331,13 @@ QWidget *AppCard::createActionPanel()
     {
         column->addWidget(createButton(QStringLiteral("Update"), true));
         column->addWidget(createButton(QStringLiteral("Uninstall"), false));
+    }
+    else if (m_model.availability == AppAvailability::Installed ||
+             (m_model.availability == AppAvailability::Error && m_model.retryUninstall))
+    {
+        auto *uninstall = createButton(QStringLiteral("Uninstall"), false);
+        connect(uninstall, &QPushButton::clicked, this, [this]() { emit uninstallRequested(m_model.packageId); });
+        column->addWidget(uninstall);
     }
     else if (m_model.availability == AppAvailability::NotInstalled || m_model.availability == AppAvailability::Error)
     {
