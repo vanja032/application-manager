@@ -6,14 +6,108 @@
 #include <winrt/Microsoft.Management.Deployment.h>
 #include <winrt/Windows.Foundation.Collections.h>
 
+#include <winrt/base.h>
+
 #include <algorithm>
 #include <cmath>
 #include <memory>
-#include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace deployment = winrt::Microsoft::Management::Deployment;
+
+namespace
+{
+
+struct WorkerApartment
+{
+    WorkerApartment()
+    {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    }
+
+    ~WorkerApartment()
+    {
+        winrt::uninit_apartment();
+    }
+
+    WorkerApartment(const WorkerApartment &) = delete;
+    WorkerApartment &operator=(const WorkerApartment &) = delete;
+};
+
+} // namespace
+
+WingetService::WingetService() : m_worker(&WingetService::workerMain, this)
+{
+}
+
+WingetService::~WingetService()
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_stop = true;
+        m_pending.reset();
+    }
+
+    m_cv.notify_one();
+
+    if (m_worker.joinable())
+    {
+        m_worker.join();
+    }
+}
+
+void WingetService::workerMain()
+{
+    const WorkerApartment apartment;
+
+    for (;;)
+    {
+        SearchRequest request;
+        {
+            std::unique_lock lock(m_mutex);
+            m_cv.wait(lock, [this] { return m_stop || m_pending.has_value(); });
+
+            if (m_stop)
+            {
+                return;
+            }
+
+            request = std::move(*m_pending);
+            m_pending.reset();
+        }
+
+        SearchCompletion completion;
+        try
+        {
+            completion.apps = SearchApps(request.query);
+        }
+        catch (const winrt::hresult_error &ex)
+        {
+            completion.error = winrt::to_string(ex.message());
+        }
+        catch (const std::exception &ex)
+        {
+            completion.error = ex.what();
+        }
+
+        if (request.callback)
+        {
+            request.callback(std::move(completion));
+        }
+    }
+}
+
+void WingetService::SearchAppsAsync(const std::wstring &query, SearchCallback callback)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_pending = SearchRequest{query, std::move(callback)};
+    }
+
+    m_cv.notify_one();
+}
 
 std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
 {
@@ -38,7 +132,9 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
     filter.Option(deployment::PackageFieldMatchOption::ContainsCaseInsensitive);
     filter.Value(query);
 
-    options.Selectors().Append(filter);
+    constexpr std::uint32_t kSearchResultLimit = 10;
+    options.Filters().Append(filter);
+    options.ResultLimit(kSearchResultLimit);
 
     auto result = connection.PackageCatalog().FindPackages(options);
     if (result.Status() != deployment::FindPackagesResultStatus::Ok)

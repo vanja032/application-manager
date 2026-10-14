@@ -2,13 +2,13 @@
 title: Mock catalog
 tags:
   - gui
-status: current
+status: superseded
 updated: 2026-10-14
 ---
 
 # Mock catalog
 
-Function `mockCatalog()` in `src/MainWindow.cpp`. This data does not come from disk or from [[WingetService]].
+`mockCatalog()` has been removed from `src/MainWindow.cpp`. The list is filled by `SearchAppsAsync`. The table below is the old sample set and is no longer shown.
 
 The initial search `whatsapp` and the Microsoft Store source show the first six rows.
 

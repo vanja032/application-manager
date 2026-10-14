@@ -24,6 +24,7 @@ struct AppCardModel
     int downloadedMb = 0;
     int totalMb = 0;
     int catalogIndex = 0;
+    bool hasAvailability = false;
 };
 
 class CircularProgress;
@@ -40,6 +41,7 @@ class AppCard : public QWidget
     QString packageId() const;
     QString source() const;
     AppAvailability availability() const;
+    bool hasAvailability() const;
     int catalogIndex() const;
 
     void setDarkMode(bool dark);

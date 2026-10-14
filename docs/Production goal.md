@@ -32,9 +32,9 @@ A C++ Windows desktop application that behaves like the Microsoft Store. The GUI
 
 | Requirement | Status |
 | --- | --- |
-| Experience similar to the Microsoft Store for managing desktop software | Partial. [[ApplicationGUI]] is a visual shell. Data is the [[Mock catalog]], not the live store. |
-| Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Not met. Cards show Not installed, Installed, Update available, Installing, and Updating from mock data. There is no Error status and no live query. |
-| Search, inspect, and install applications from the Microsoft Store source | Partial. The search field and Microsoft Store source exist in the UI. [[WingetService]] can search and install `msstore` packages from [[WingetPoC]]. The GUI does not call it, and card buttons have no handlers. |
+| Experience similar to the Microsoft Store for managing desktop software | Partial. Search shows live `msstore` results. Install, update, and uninstall are not wired. |
+| Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Not met. Search cards show name and package ID only. There is no live install status and no Error status. |
+| Search, inspect, and install applications from the Microsoft Store source | Partial. The GUI search calls `SearchAppsAsync` and lists name and package ID. Install is still not started from the GUI. |
 
 ### 2. Technology choice
 
@@ -42,14 +42,14 @@ The assessment asks for an independent choice of winget integration aimed at Mic
 
 | Choice | Status |
 | --- | --- |
-| Backend: in-process Windows Package Manager COM (`Microsoft.Management.Deployment`), catalog `msstore`, wrapped by [[WingetService]] | Met as the selected integration. Proven from the console. Not used by the GUI. See [[Decision 0006 Stack]]. |
+| Backend: in-process Windows Package Manager COM (`Microsoft.Management.Deployment`), catalog `msstore`, wrapped by [[WingetService]] | Met as the selected integration. The GUI uses it for search. Install, update, and uninstall are still console-only. See [[Decision 0006 Stack]]. |
 | UI: Qt 6.12 Widgets | Met as the selected framework. See [[Decision 0006 Stack]]. |
 
 ### 3. UI and asynchronous architecture
 
 | Requirement | Status |
 | --- | --- |
-| GUI stays responsive. Download, install, and status queries never block the interface | Not met. `InstallApp`, `UninstallApp`, and `UpdateApp` wait on the WinRT operation with `.get()`. Nothing in the GUI runs those calls off the UI thread. |
+| GUI stays responsive. Download, install, and status queries never block the interface | Partial. Search runs on a Core worker thread. Install, update, and uninstall still block inside `.get()` and are not called by the GUI. |
 
 ## Bonus features
 
@@ -59,7 +59,7 @@ These are in scope for the finished application.
 | --- | --- |
 | Launch an installed Microsoft Store app from the UI | Not met. |
 | Uninstall from the application | Partial. [[WingetService]] and [[WingetPoC]] can uninstall. The GUI cannot. |
-| Detect available updates and apply them | Partial. [[WingetService]] and [[WingetPoC]] can update. The GUI shows mock update cards only. |
+| Detect available updates and apply them | Partial. [[WingetService]] and [[WingetPoC]] can update. The GUI has no update status yet. |
 
 ## Deliverables
 

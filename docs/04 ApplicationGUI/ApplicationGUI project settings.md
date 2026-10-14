@@ -16,6 +16,7 @@ Debug|x64 and Release|x64:
 - C++20
 - `AdditionalIncludeDirectories`: `$(ProjectDir)include;$(SolutionDir)ApplicationCore\include;%(AdditionalIncludeDirectories)`
 - reference to ApplicationCore
+- `WindowsApp.lib`, required once the GUI calls into the WinRT code inside ApplicationCore
 
 Project items:
 

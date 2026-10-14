@@ -5,6 +5,7 @@
 
 #include <QtCore/QEvent>
 #include <QtCore/QFile>
+#include <QtCore/QMetaObject>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QPainter>
@@ -120,61 +121,6 @@ QString loadStyleSheet(const QString &path)
     return QString::fromUtf8(file.readAll());
 }
 
-AppCardModel makeApp(const QString &name, const QString &packageId, const QString &source, AppAvailability availability)
-{
-    AppCardModel model;
-    model.name = name;
-    model.packageId = packageId;
-    model.source = source;
-    model.availability = availability;
-    return model;
-}
-
-std::vector<AppCardModel> mockCatalog()
-{
-    const QString store = QStringLiteral("Microsoft Store");
-    const QString winget = QStringLiteral("winget");
-
-    AppCardModel whatsApp = makeApp(QStringLiteral("WhatsApp"), QStringLiteral("9NKSQGP7F2NH"), store, AppAvailability::Installed);
-
-    AppCardModel business =
-        makeApp(QStringLiteral("WhatsApp Business"), QStringLiteral("9PG2B0DLY5HT"), store, AppAvailability::UpdateAvailable);
-    business.availableVersion = QStringLiteral("2.2639.100.0");
-
-    AppCardModel desktop =
-        makeApp(QStringLiteral("WhatsApp Desktop"), QStringLiteral("5319275A.WhatsAppDesktop"), store, AppAvailability::Installing);
-    desktop.progressPercent = 68;
-    desktop.downloadedMb = 325;
-    desktop.totalMb = 520;
-
-    AppCardModel web = makeApp(QStringLiteral("WhatsApp Web"), QStringLiteral("9NBLGGH4M8R0"), store, AppAvailability::NotInstalled);
-    AppCardModel beta = makeApp(QStringLiteral("WhatsApp Beta"), QStringLiteral("9NKSQGP7F2NH"), store, AppAvailability::NotInstalled);
-    AppCardModel messenger =
-        makeApp(QStringLiteral("WhatsApp Messenger"), QStringLiteral("9NKSQGP7F2NH"), store, AppAvailability::NotInstalled);
-
-    AppCardModel code = makeApp(QStringLiteral("Visual Studio Code"), QStringLiteral("Microsoft.VisualStudioCode"), winget,
-                                 AppAvailability::UpdateAvailable);
-    code.installedVersion = QStringLiteral("1.95.3");
-    code.availableVersion = QStringLiteral("1.96.2");
-
-    AppCardModel spotify = makeApp(QStringLiteral("Spotify"), QStringLiteral("9NCBCSZSJRSB"), store, AppAvailability::UpdateAvailable);
-    spotify.availableVersion = QStringLiteral("1.2.70.0");
-
-    AppCardModel firefox =
-        makeApp(QStringLiteral("Mozilla Firefox"), QStringLiteral("Mozilla.Firefox"), winget, AppAvailability::Installed);
-    firefox.installedVersion = QStringLiteral("133.0.3");
-
-    AppCardModel powerToys =
-        makeApp(QStringLiteral("PowerToys"), QStringLiteral("Microsoft.PowerToys"), winget, AppAvailability::Updating);
-    powerToys.progressPercent = 42;
-    powerToys.downloadedMb = 80;
-    powerToys.totalMb = 190;
-
-    AppCardModel vlc = makeApp(QStringLiteral("VLC media player"), QStringLiteral("VideoLAN.VLC"), winget, AppAvailability::NotInstalled);
-
-    return {whatsApp, business, desktop, web, beta, messenger, code, spotify, firefox, powerToys, vlc};
-}
-
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
@@ -207,20 +153,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     m_updatesBadge->setAlignment(Qt::AlignCenter);
     m_updatesBadge->setFixedSize(22, 22);
     m_updatesBadge->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_updatesBadge->setVisible(false);
     ui.updatesButton->installEventFilter(this);
 
     configureNavigation();
-    loadMockCatalog();
     applyTheme(false);
     showSection(Section::Discover);
 
     m_darkModeSwitch->setOnToggled([this](bool checked) { applyTheme(checked); });
 
-    connect(ui.searchButton, &QPushButton::clicked, this, [this]() { refreshAppList(); });
-    connect(ui.searchEdit, &QLineEdit::returnPressed, this, [this]() { refreshAppList(); });
-    connect(ui.searchEdit, &QLineEdit::textChanged, this, [this](const QString &) { refreshAppList(); });
+    connect(ui.searchButton, &QPushButton::clicked, this, [this]() { startSearch(); });
+    connect(ui.searchEdit, &QLineEdit::returnPressed, this, [this]() { startSearch(); });
     connect(ui.sourceCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
     connect(ui.sortCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
+
+    startSearch();
 }
 
 MainWindow::~MainWindow() = default;
@@ -380,30 +327,6 @@ void MainWindow::configureIcons()
     configureSearchField();
 }
 
-void MainWindow::loadMockCatalog()
-{
-    const std::vector<AppCardModel> catalog = mockCatalog();
-    m_cards.reserve(catalog.size());
-
-    int updateCount = 0;
-    for (int index = 0; index < static_cast<int>(catalog.size()); ++index)
-    {
-        AppCardModel model = catalog[index];
-        model.catalogIndex = index;
-        if (model.availability == AppAvailability::UpdateAvailable && model.source == QStringLiteral("Microsoft Store"))
-        {
-            ++updateCount;
-        }
-
-        auto *card = new AppCard(model, ui.appListContainer);
-        card->hide();
-        m_cards.push_back(card);
-    }
-
-    m_updatesBadge->setText(QString::number(updateCount));
-    m_updatesBadge->setVisible(updateCount > 0);
-}
-
 void MainWindow::applyTheme(bool dark)
 {
     m_darkMode = dark;
@@ -474,8 +397,98 @@ void MainWindow::showSection(Section section)
     refreshAppList();
 }
 
+void MainWindow::startSearch()
+{
+    const std::uint64_t generation = ++m_searchGeneration;
+    const QString query = ui.searchEdit->text().trimmed();
+    if (query.isEmpty())
+    {
+        showStatus(QStringLiteral("No applications match your search."));
+        return;
+    }
+
+    showStatus(QStringLiteral("Searching..."));
+
+    m_service.SearchAppsAsync(query.toStdWString(), [this, generation](SearchCompletion completion) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, generation, completion]() {
+                if (generation != m_searchGeneration)
+                {
+                    return;
+                }
+
+                applySearchCompletion(completion);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void MainWindow::showStatus(const QString &text)
+{
+    clearCards();
+    m_statusText = text;
+    ui.emptyStateLabel->setText(text);
+    ui.emptyStateLabel->setVisible(true);
+    ui.appScrollArea->setVisible(false);
+}
+
+void MainWindow::clearCards()
+{
+    while (QLayoutItem *item = ui.appListLayout->takeAt(0))
+    {
+        delete item->widget();
+        delete item;
+    }
+
+    m_cards.clear();
+}
+
+void MainWindow::applySearchCompletion(const SearchCompletion &completion)
+{
+    if (!completion.error.empty())
+    {
+        showStatus(QString::fromStdString(completion.error));
+        return;
+    }
+
+    clearCards();
+    m_statusText.clear();
+
+    int index = 0;
+    for (const AppInfo &app : completion.apps)
+    {
+        AppCardModel model;
+        model.name = QString::fromStdWString(app.name);
+        model.packageId = QString::fromStdWString(app.id);
+        model.source = QStringLiteral("Microsoft Store");
+        model.catalogIndex = index++;
+
+        auto *card = new AppCard(model, ui.appListContainer);
+        card->hide();
+        m_cards.push_back(card);
+    }
+
+    if (m_cards.empty())
+    {
+        showStatus(QStringLiteral("No applications match your search."));
+        return;
+    }
+
+    refreshAppList();
+}
+
 void MainWindow::refreshAppList()
 {
+    if (m_cards.empty())
+    {
+        ui.emptyStateLabel->setText(m_statusText.isEmpty() ? QStringLiteral("No applications match your search.")
+                                                            : m_statusText);
+        ui.emptyStateLabel->setVisible(true);
+        ui.appScrollArea->setVisible(false);
+        return;
+    }
+
     std::vector<AppCard *> ordered = m_cards;
     if (ui.sortCombo->currentText() == QStringLiteral("Name"))
     {
@@ -521,6 +534,10 @@ void MainWindow::refreshAppList()
     }
     ui.appListLayout->addStretch(1);
 
+    if (!anyVisible)
+    {
+        ui.emptyStateLabel->setText(QStringLiteral("No applications match your search."));
+    }
     ui.emptyStateLabel->setVisible(!anyVisible);
     ui.appScrollArea->setVisible(anyVisible);
     ui.appScrollArea->verticalScrollBar()->setValue(scrollValue);
@@ -528,24 +545,34 @@ void MainWindow::refreshAppList()
 
 bool MainWindow::cardMatches(const AppCard *card) const
 {
-    const AppAvailability availability = card->availability();
-    if (m_section == Section::Installed && availability == AppAvailability::NotInstalled)
+    if (!card->hasAvailability())
     {
-        return false;
+        if (m_section != Section::Discover)
+        {
+            return false;
+        }
     }
-    if (m_section == Section::Updates && availability != AppAvailability::UpdateAvailable)
+    else
     {
-        return false;
-    }
+        const AppAvailability availability = card->availability();
+        if (m_section == Section::Installed && availability == AppAvailability::NotInstalled)
+        {
+            return false;
+        }
+        if (m_section == Section::Updates && availability != AppAvailability::UpdateAvailable)
+        {
+            return false;
+        }
 
-    const int filterId = m_filterGroup->checkedId();
-    if (filterId == static_cast<int>(StatusFilter::Installed) && availability == AppAvailability::NotInstalled)
-    {
-        return false;
-    }
-    if (filterId == static_cast<int>(StatusFilter::NotInstalled) && availability != AppAvailability::NotInstalled)
-    {
-        return false;
+        const int filterId = m_filterGroup->checkedId();
+        if (filterId == static_cast<int>(StatusFilter::Installed) && availability == AppAvailability::NotInstalled)
+        {
+            return false;
+        }
+        if (filterId == static_cast<int>(StatusFilter::NotInstalled) && availability != AppAvailability::NotInstalled)
+        {
+            return false;
+        }
     }
 
     const QString source = ui.sourceCombo->currentText();

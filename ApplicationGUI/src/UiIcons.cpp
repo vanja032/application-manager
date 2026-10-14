@@ -169,17 +169,17 @@ QIcon UiIcons::icon(Glyph glyph, const QColor &color, int size)
 QPixmap UiIcons::windowsLogo(int size)
 {
     return createPixmap(size, [&](QPainter &painter) {
+        painter.setRenderHint(QPainter::Antialiasing, false);
         painter.setPen(Qt::NoPen);
         const qreal gap = size * 0.08;
         const qreal tile = (size - gap) / 2.0;
-        const qreal radius = size * 0.08;
         painter.setBrush(QColor(QStringLiteral("#F25022")));
-        painter.drawRoundedRect(QRectF(0.0, 0.0, tile, tile), radius, radius);
+        painter.drawRect(QRectF(0.0, 0.0, tile, tile));
         painter.setBrush(QColor(QStringLiteral("#7FBA00")));
-        painter.drawRoundedRect(QRectF(tile + gap, 0.0, tile, tile), radius, radius);
+        painter.drawRect(QRectF(tile + gap, 0.0, tile, tile));
         painter.setBrush(QColor(QStringLiteral("#00A4EF")));
-        painter.drawRoundedRect(QRectF(0.0, tile + gap, tile, tile), radius, radius);
+        painter.drawRect(QRectF(0.0, tile + gap, tile, tile));
         painter.setBrush(QColor(QStringLiteral("#FFB900")));
-        painter.drawRoundedRect(QRectF(tile + gap, tile + gap, tile, tile), radius, radius);
+        painter.drawRect(QRectF(tile + gap, tile + gap, tile, tile));
     });
 }

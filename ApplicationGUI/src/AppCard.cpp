@@ -59,9 +59,16 @@ AppCard::AppCard(const AppCardModel &model, QWidget *parent) : QWidget(parent), 
     layout->setSpacing(16);
     layout->addWidget(icon, 0, Qt::AlignVCenter);
     layout->addLayout(identity, 3);
-    layout->addWidget(createStatusPanel(), 0, Qt::AlignVCenter);
-    layout->addStretch(1);
-    layout->addWidget(createActionPanel(), 0, Qt::AlignVCenter);
+    if (m_model.hasAvailability)
+    {
+        layout->addWidget(createStatusPanel(), 0, Qt::AlignVCenter);
+        layout->addStretch(1);
+        layout->addWidget(createActionPanel(), 0, Qt::AlignVCenter);
+    }
+    else
+    {
+        layout->addStretch(1);
+    }
 }
 
 QString AppCard::name() const
@@ -82,6 +89,11 @@ QString AppCard::source() const
 AppAvailability AppCard::availability() const
 {
     return m_model.availability;
+}
+
+bool AppCard::hasAvailability() const
+{
+    return m_model.hasAvailability;
 }
 
 int AppCard::catalogIndex() const

@@ -16,8 +16,8 @@ Three projects in `ApplicationManager.sln` split that work:
 | --- | --- | --- |
 | [[ApplicationCore]] | Static library. Search and package operations. | Search, install, update, and uninstall run against `msstore`. |
 | [[WingetPoC]] | Console proof that the service works. | Manual flow for the first `whatsapp` search hit. |
-| [[ApplicationGUI]] | Qt Widgets interface. | Graphical shell with mock data. It does not call the service. |
+| [[ApplicationGUI]] | Qt Widgets interface. | Search calls `SearchAppsAsync`. Install, update, and uninstall are not connected. |
 
-ApplicationGUI references ApplicationCore, so the library builds with the GUI project, but no GUI source includes `WingetService.h` or calls its methods.
+ApplicationGUI references ApplicationCore. The window calls `SearchAppsAsync` only.
 
-Related: [[Production goal]], [[Solution]], [[Decision 0001 UI before backend]], [[Decision 0002 Microsoft Store only]], [[Decision 0006 Stack]].
+Related: [[Production goal]], [[Solution]], [[Decision 0001 UI before backend]], [[Decision 0002 Microsoft Store only]], [[Decision 0006 Stack]], [[Store search]].

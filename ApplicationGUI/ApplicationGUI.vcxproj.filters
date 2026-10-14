@@ -47,6 +47,9 @@
     <ClCompile Include="src\UiIcons.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\AnchoredComboBox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <QtMoc Include="include\AppCard.h">
       <Filter>Header Files</Filter>
     </QtMoc>
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <ClInclude Include="include\UiIcons.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AnchoredComboBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <None Include="resources\styles.qss">

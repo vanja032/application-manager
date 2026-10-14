@@ -10,7 +10,7 @@ updated: 2026-10-14
 
 Qt 6.12 Widgets application. The entry point is `src/main.cpp`: Fusion style when it is available, Segoe UI 10 pt, then `MainWindow`.
 
-The project stays away from backend code while a task is interface-only. See [[Decision 0001 UI before backend]].
+The window calls [[WingetService]] for search only. Install, update, and uninstall stay in Core and are not connected to the buttons.
 
 ## Parts
 
@@ -18,7 +18,7 @@ The project stays away from backend code while a task is interface-only. See [[D
 - [[Application card]] — `AppCard`
 - [[Circular progress]] — `CircularProgress`
 - [[Icons and theme]] — `UiIcons` and QSS
-- [[Mock catalog]] — the data that fills the list
+- [[Mock catalog]] — removed; the list is filled from search results
 - [[ApplicationGUI project settings]]
 
 `ToggleSwitch` is not its own file. It is a `QWidget` in `MainWindow.cpp`, without `Q_OBJECT`, with a callback. It has to live in the global namespace so moc can see the forward declaration in the header.

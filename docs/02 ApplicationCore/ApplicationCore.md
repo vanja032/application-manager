@@ -30,4 +30,4 @@ The WinRT namespace in code is `winrt::Microsoft::Management::Deployment`.
 
 Public methods are PascalCase (`SearchApps`, `InstallApp`). That is the convention of this project. The GUI uses Qt camelCase.
 
-Related: [[ApplicationCore project settings]], [[Decision 0002 Microsoft Store only]].
+Related: [[ApplicationCore project settings]], [[Decision 0002 Microsoft Store only]], [[Store search]].

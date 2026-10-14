@@ -26,5 +26,6 @@ Then:
 6. What the GUI shows today and what is still mock data. Source: [[ApplicationGUI]], [[Mock catalog]].
 7. Visual rules: square corners, light and dark theme. Source: [[Decision 0003 Visual language]].
 8. Known limits. Source: [[Open questions]].
+9. How Store search treats common words, and the search advantages this app can still add. Source: [[Store search]].
 
 Write the README only when these items are no longer just an outline. The language is English.

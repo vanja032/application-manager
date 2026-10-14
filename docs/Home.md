@@ -21,6 +21,7 @@ Working notes for Windows App Manager. This folder is the Obsidian vault. The re
 - [[Build]]
 - [[Decision index]]
 - [[ApplicationCore]]
+- [[Store search]]
 - [[WingetPoC]]
 - [[ApplicationGUI]]
 - [[Open questions]]

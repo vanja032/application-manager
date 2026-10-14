@@ -445,7 +445,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QComboBox" name="sourceCombo">
+              <widget class="AnchoredComboBox" name="sourceCombo">
                <property name="minimumSize">
                 <size>
                  <width>168</width>
@@ -552,7 +552,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="sortCombo">
+           <widget class="AnchoredComboBox" name="sortCombo">
             <property name="minimumSize">
              <size>
               <width>168</width>
@@ -908,4 +908,11 @@
   <include location="ApplicationGUI.qrc"/>
  </resources>
  <connections/>
+ <customwidgets>
+  <customwidget>
+   <class>AnchoredComboBox</class>
+   <extends>QComboBox</extends>
+   <header>AnchoredComboBox.h</header>
+  </customwidget>
+ </customwidgets>
 </ui>

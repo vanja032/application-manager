@@ -2,9 +2,13 @@
 
 #pragma once
 
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "AppInfo.h"
@@ -54,18 +58,49 @@ struct UpdateProgressInfo
     uint64_t totalBytes = 0;
 };
 
+struct SearchCompletion
+{
+    std::vector<AppInfo> apps;
+    std::string error;
+};
+
 class WingetService
 {
   public:
     using ProgressCallback = std::function<void(const InstallProgressInfo &)>;
     using UninstallProgressCallback = std::function<void(const UninstallProgressInfo &)>;
     using UpdateProgressCallback = std::function<void(const UpdateProgressInfo &)>;
+    using SearchCallback = std::function<void(SearchCompletion)>;
+
+    WingetService();
+    ~WingetService();
+
+    WingetService(const WingetService &) = delete;
+    WingetService &operator=(const WingetService &) = delete;
+    WingetService(WingetService &&) = delete;
+    WingetService &operator=(WingetService &&) = delete;
 
     std::vector<AppInfo> SearchApps(const std::wstring &query) const;
+    void SearchAppsAsync(const std::wstring &query, SearchCallback callback);
 
     void InstallApp(const std::wstring &packageId, ProgressCallback onProgress = {}) const;
 
     void UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress = {}) const;
 
     void UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress = {}) const;
+
+  private:
+    struct SearchRequest
+    {
+        std::wstring query;
+        SearchCallback callback;
+    };
+
+    void workerMain();
+
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    std::optional<SearchRequest> m_pending;
+    bool m_stop = false;
+    std::thread m_worker;
 };
