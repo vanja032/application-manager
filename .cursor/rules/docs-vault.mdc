@@ -1,0 +1,17 @@
+---
+description: Keep the Obsidian docs vault current after crucial project changes
+alwaysApply: true
+---
+
+# Docs vault
+
+The living project notes are the Obsidian vault in `docs/`. Open that folder as the vault. Start from `docs/Home.md`.
+
+After a crucial task (new behavior, architecture change, project layout, build setup, or a decision that later README text will depend on):
+
+- Update the existing note for the affected project or component.
+- Add a decision note under `docs/01 Decisions/` when the change records a choice, and link it from `Decision index`.
+- Add one dated line to `docs/Log.md`.
+- Leave the root `README` unwritten until the notes are ready to be turned into it. `docs/README outline.md` is only the outline.
+
+Write notes in English. Keep class names, paths, and API names in the form used in the code. Do not duplicate long code listings; link the source path and describe the behavior.

@@ -1,0 +1,24 @@
+
+---
+description: Qt Widgets and C++ development rules
+alwaysApply: true
+---
+
+# Project rules
+
+- Use C++20, Qt 6.12 Widgets, Visual Studio 2022 and MSBuild.
+- Consult Context7 and official Qt 6.12 documentation when unsure about Qt APIs.
+- Prefer official documentation: https://doc.qt.io/qt-6.12/
+- Never invent Qt classes, methods or properties.
+- Use the existing ui/MainWindow.ui for the main interface. Keep headers in include/, sources in src/, and QSS plus icons in resources/.
+- Use custom QWidget components for dynamic application cards.
+- Use QPainter for the circular progress indicator.
+- Use Qt layouts instead of absolute positioning.
+- Use QSS for visual styling where appropriate.
+- Do not introduce QML, Qt Quick, CMake or third-party UI frameworks.
+- Follow existing C++ formatting and naming conventions.
+- Keep ApplicationCore, WingetPoC and ApplicationGUI separated.
+- Do not modify backend code during UI-only tasks.
+- Do not change project configuration or dependencies unnecessarily.
+- Ensure new files are included in the existing Qt/MSBuild project.
+- Build and check for compilation errors after changes.

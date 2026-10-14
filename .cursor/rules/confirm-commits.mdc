@@ -1,0 +1,12 @@
+---
+description: Ask the user to confirm before creating any git commit
+alwaysApply: true
+---
+
+# Confirm before commit
+
+Do not create a git commit until the user has confirmed that exact commit.
+
+State the files and the proposed message, then wait. A later commit needs its own confirmation. When the user names the commits and tells you to create them, that message confirms only those commits.
+
+Do not set author or committer values, and do not change git config. Run `git commit` with the message only, so git uses the default user.
