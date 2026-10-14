@@ -1,0 +1,433 @@
+QMainWindow,
+QWidget#centralWidget,
+QWidget#contentPanel {
+    background: #F3F5F9;
+}
+
+QWidget#searchRow,
+QWidget#filterRow,
+QWidget#sourceColumn,
+QWidget#pageList,
+QWidget#pageSettings,
+QWidget#pageAbout,
+QWidget#appListContainer,
+QStackedWidget#pages,
+QScrollArea#appScrollArea {
+    background: transparent;
+    border: none;
+}
+
+QFrame#sidebar {
+    background: #F7F8FB;
+    border: none;
+    border-right: 1px solid #E6EAF0;
+}
+
+QLabel#brandTitle,
+QLabel#brandSubtitle {
+    color: #1F1F1F;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+QLabel#darkModeLabel {
+    color: #3A3F46;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+QPushButton#discoverButton,
+QPushButton#installedButton,
+QPushButton#updatesButton,
+QPushButton#settingsButton,
+QPushButton#aboutButton {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: #3A3F46;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    padding: 0;
+    min-height: 40px;
+}
+
+QPushButton#discoverButton QLabel#navText,
+QPushButton#installedButton QLabel#navText,
+QPushButton#updatesButton QLabel#navText,
+QPushButton#settingsButton QLabel#navText,
+QPushButton#aboutButton QLabel#navText,
+QLabel#darkModeLabel {
+    color: #3A3F46;
+    font-size: 14px;
+    font-weight: 500;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+QLabel#navIcon,
+QLabel#darkModeIcon {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+QPushButton#discoverButton:hover,
+QPushButton#installedButton:hover,
+QPushButton#updatesButton:hover,
+QPushButton#settingsButton:hover,
+QPushButton#aboutButton:hover {
+    background: #EEF3F8;
+}
+
+QPushButton#discoverButton:checked,
+QPushButton#installedButton:checked,
+QPushButton#updatesButton:checked,
+QPushButton#settingsButton:checked,
+QPushButton#aboutButton:checked,
+QPushButton#discoverButton:checked:hover,
+QPushButton#installedButton:checked:hover,
+QPushButton#updatesButton:checked:hover,
+QPushButton#settingsButton:checked:hover,
+QPushButton#aboutButton:checked:hover {
+    background: #E5F1FB;
+    color: #1A1A1A;
+    font-weight: 600;
+}
+
+QPushButton#discoverButton:checked QLabel#navText,
+QPushButton#installedButton:checked QLabel#navText,
+QPushButton#updatesButton:checked QLabel#navText,
+QPushButton#settingsButton:checked QLabel#navText,
+QPushButton#aboutButton:checked QLabel#navText {
+    color: #1A1A1A;
+    font-weight: 600;
+}
+
+QLabel#updatesBadge {
+    background: #0078D4;
+    color: #FFFFFF;
+    border-radius: 0;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QFrame#searchFrame {
+    background: #FFFFFF;
+    border: 1px solid #D0D5DD;
+    border-radius: 0;
+}
+
+QFrame#searchFrame[focused="true"] {
+    border: 1px solid #0078D4;
+}
+
+QLineEdit#searchEdit {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 14px;
+    color: #202124;
+    selection-background-color: #0078D4;
+    selection-color: #FFFFFF;
+}
+
+QLabel#searchIcon {
+    background: transparent;
+}
+
+QToolButton#searchClearButton {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+QToolButton#searchClearButton:hover {
+    background: transparent;
+}
+
+QPushButton#searchButton,
+QPushButton#primaryButton {
+    background: #0078D4;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 0;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+}
+
+QPushButton#searchButton:hover,
+QPushButton#primaryButton:hover {
+    background: #106EBE;
+}
+
+QPushButton#searchButton:pressed,
+QPushButton#primaryButton:pressed {
+    background: #005A9E;
+}
+
+QPushButton#secondaryButton {
+    background: #FFFFFF;
+    color: #242424;
+    border: 1px solid #D0D5DD;
+    border-radius: 0;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+}
+
+QPushButton#secondaryButton:hover {
+    background: #F5F7FA;
+    border-color: #C5CDD8;
+}
+
+QPushButton#secondaryButton:pressed {
+    background: #EEF2F6;
+}
+
+QLabel#sourceLabel,
+QLabel#sortLabel {
+    color: #6B7280;
+    font-size: 12px;
+}
+
+QComboBox#sourceCombo,
+QComboBox#sortCombo {
+    background: #FFFFFF;
+    color: #202124;
+    border: 1px solid #D0D5DD;
+    border-radius: 0;
+    padding: 0 8px 0 12px;
+    min-height: 38px;
+    font-size: 14px;
+}
+
+QComboBox#sourceCombo:hover,
+QComboBox#sortCombo:hover {
+    border-color: #C5CDD8;
+}
+
+QComboBox#sourceCombo:focus,
+QComboBox#sortCombo:focus {
+    border: 1px solid #0078D4;
+}
+
+QComboBox#sourceCombo::drop-down,
+QComboBox#sortCombo::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 32px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+QComboBox#sourceCombo::down-arrow,
+QComboBox#sortCombo::down-arrow {
+    image: url(:/icons/chevron.svg);
+    width: 12px;
+    height: 8px;
+}
+
+QListView#comboPopup {
+    background: #FFFFFF;
+    color: #202124;
+    border: 1px solid #D0D5DD;
+    border-radius: 0;
+    outline: 0;
+    padding: 4px 0;
+}
+
+QListView#comboPopup::item {
+    min-height: 32px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 0;
+    color: #202124;
+}
+
+QListView#comboPopup::item:hover {
+    background: #F3F6FA;
+}
+
+QListView#comboPopup::item:selected {
+    background: #E5F1FB;
+    color: #202124;
+}
+
+QPushButton#filterAllButton,
+QPushButton#filterInstalledButton,
+QPushButton#filterNotInstalledButton {
+    background: #FFFFFF;
+    color: #242424;
+    border: 1px solid #E1E5EC;
+    border-radius: 0;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 16px;
+    min-height: 18px;
+}
+
+QPushButton#filterAllButton:hover,
+QPushButton#filterInstalledButton:hover,
+QPushButton#filterNotInstalledButton:hover {
+    background: #F7F9FC;
+}
+
+QPushButton#filterAllButton:checked,
+QPushButton#filterInstalledButton:checked,
+QPushButton#filterNotInstalledButton:checked,
+QPushButton#filterAllButton:checked:hover,
+QPushButton#filterInstalledButton:checked:hover,
+QPushButton#filterNotInstalledButton:checked:hover {
+    background: #0078D4;
+    color: #FFFFFF;
+    border: 1px solid #0078D4;
+}
+
+QLabel#emptyStateLabel {
+    color: #6B7280;
+    font-size: 15px;
+}
+
+AppCard {
+    background: #FFFFFF;
+    border: 1px solid #E4E8EF;
+    border-radius: 0;
+}
+
+AppCard:hover {
+    border: 1px solid #C9D2DE;
+}
+
+AppCard QLabel {
+    background: transparent;
+    border: none;
+}
+
+AppCard QLabel#packageIcon {
+    background: #F0F2F6;
+    border-radius: 0;
+}
+
+QLabel#appName {
+    color: #202124;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel#packageId,
+QLabel#statusDetail {
+    color: #8B919A;
+    font-size: 12px;
+}
+
+QLabel#statusIcon {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+QLabel#statusInstalled {
+    color: #107C10;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
+QLabel#statusUpdate {
+    color: #0078D4;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
+QLabel#statusMuted {
+    color: #8B919A;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
+QLabel#statusBusy {
+    color: #202124;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QLabel#settingsTitle,
+QLabel#aboutTitle {
+    color: #1A1A1A;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+QLabel#settingsSubtitle,
+QLabel#aboutVersion {
+    color: #6B7280;
+    font-size: 14px;
+}
+
+QFrame#settingsCard,
+QFrame#aboutCard {
+    background: #FFFFFF;
+    border: 1px solid #E4E8EF;
+    border-radius: 0;
+}
+
+QLabel#settingsAppearanceHeading,
+QLabel#settingsCatalogHeading {
+    color: #1A1A1A;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QLabel#settingsAppearanceBody,
+QLabel#settingsCatalogBody,
+QLabel#aboutBody {
+    color: #5C6570;
+    font-size: 13px;
+}
+
+QScrollArea#appScrollArea QScrollBar:vertical {
+    background: transparent;
+    width: 6px;
+    margin: 0;
+    border: none;
+}
+
+QScrollArea#appScrollArea QScrollBar::handle:vertical {
+    background: #C8CDD6;
+    border-radius: 0;
+    min-height: 32px;
+    margin: 0 1px;
+}
+
+QScrollArea#appScrollArea QScrollBar::handle:vertical:hover {
+    background: #A8B0BC;
+}
+
+QScrollArea#appScrollArea QScrollBar::add-line:vertical,
+QScrollArea#appScrollArea QScrollBar::sub-line:vertical {
+    height: 0;
+    width: 0;
+    background: none;
+    border: none;
+    subcontrol-position: top;
+}
+
+QScrollArea#appScrollArea QScrollBar::add-page:vertical,
+QScrollArea#appScrollArea QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar:horizontal {
+    height: 0;
+}

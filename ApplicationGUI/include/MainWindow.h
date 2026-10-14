@@ -1,0 +1,68 @@
+#pragma once
+
+#include <vector>
+
+#include <QtWidgets/QMainWindow>
+
+#include "ui_MainWindow.h"
+
+class AppCard;
+class QButtonGroup;
+class QEvent;
+class QFrame;
+class QLabel;
+class QShowEvent;
+class QToolButton;
+class ToggleSwitch;
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+  public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+
+  protected:
+    void showEvent(QShowEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
+  private:
+    enum class Section
+    {
+        Discover,
+        Installed,
+        Updates,
+        Settings,
+        About
+    };
+
+    enum class StatusFilter
+    {
+        All = 0,
+        Installed = 1,
+        NotInstalled = 2
+    };
+
+    void configureNavigation();
+    void configureSearchField();
+    void configureIcons();
+    void loadMockCatalog();
+    void applyTheme(bool dark);
+    void showSection(Section section);
+    void refreshAppList();
+    void positionUpdatesBadge();
+    bool cardMatches(const AppCard *card) const;
+
+    Ui::MainWindowClass ui;
+    QButtonGroup *m_navGroup = nullptr;
+    QButtonGroup *m_filterGroup = nullptr;
+    ToggleSwitch *m_darkModeSwitch = nullptr;
+    QFrame *m_searchFrame = nullptr;
+    QLabel *m_searchIcon = nullptr;
+    QToolButton *m_searchClear = nullptr;
+    QLabel *m_updatesBadge = nullptr;
+    std::vector<AppCard *> m_cards;
+    Section m_section = Section::Discover;
+    bool m_darkMode = false;
+};
