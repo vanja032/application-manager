@@ -3,7 +3,7 @@ title: Main window
 tags:
   - gui
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Main window
@@ -28,7 +28,9 @@ Beside search is the Source column. The combo has only Microsoft Store. Source a
 
 Filters, on Discover only: All, Installed, and Not installed. Installed keeps Installed, Update available, and a card that is uninstalling, updating, or failed at either. Not installed keeps the rest, including an install that is still queued or downloading. Sort: Relevance (result order) and Name (`localeAwareCompare`). The search row and these three filters are hidden on Installed and Updates. Sort stays.
 
-`QStackedWidget` has three pages: the list, Settings, and About. The list is `QScrollArea#appScrollArea`. The horizontal scrollbar is off. The vertical scrollbar is 6 px, margin 0, with the thumb inset 1 px on each side. The list content bottom margin is 0 and the right margin is 2 px, so the cards stay wider.
+`QStackedWidget` has the list, Settings, About, and an application page added in code. The list is `QScrollArea#appScrollArea`. The horizontal scrollbar is off. The vertical scrollbar is 6 px, margin 0, with the thumb inset 1 px on each side. The list content bottom margin is 0 and the right margin is 2 px, so the cards stay wider.
+
+A click on a card opens [[Application detail]] for that package. The search row and the filter row hide while that page is open. Back returns to the list and restores them for the current section. Choosing another sidebar section closes the page as well. Install, uninstall, update, and launch from the page use the same actions as the card. A status change for the open package refreshes the page. A failed launch shows its message on the page. If launch was started from the card, that failure opens the page and shows the message.
 
 An empty list shows a label instead of the scroll area. Discover says nothing matched the search. Installed says there are no installed applications. Updates says there are no updates.
 
@@ -42,4 +44,4 @@ Discover shows the current search. All, Installed, and Not installed filter that
 
 Refreshing the list hides non-matches, sorts the visible cards, and restores the scroll position.
 
-Related: [[Application card]], [[Mock catalog]], [[Decision 0003 Visual language]].
+Related: [[Application card]], [[Application detail]], [[Mock catalog]], [[Decision 0003 Visual language]].

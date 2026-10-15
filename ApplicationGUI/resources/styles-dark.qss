@@ -10,6 +10,7 @@ QWidget#sourceColumn,
 QWidget#pageList,
 QWidget#pageSettings,
 QWidget#pageAbout,
+QWidget#detailPage,
 QWidget#appListContainer,
 QStackedWidget#pages,
 QScrollArea#appScrollArea {
@@ -369,20 +370,23 @@ QLabel#statusError {
 }
 
 QLabel#settingsTitle,
-QLabel#aboutTitle {
+QLabel#aboutTitle,
+QLabel#detailTitle {
     color: #F3F5F8;
     font-size: 28px;
     font-weight: 700;
 }
 
 QLabel#settingsSubtitle,
-QLabel#aboutVersion {
+QLabel#aboutVersion,
+QLabel#detailSubtitle {
     color: #A7B0BE;
     font-size: 14px;
 }
 
 QFrame#settingsCard,
-QFrame#aboutCard {
+QFrame#aboutCard,
+QFrame#detailCard {
     background: #242A34;
     border: 1px solid #343C48;
     border-radius: 0;
@@ -410,6 +414,21 @@ QLabel#aboutName {
 }
 
 QLabel#aboutLink {
+    font-size: 13px;
+}
+
+QLabel#detailLabel {
+    color: #A7B0BE;
+    font-size: 12px;
+}
+
+QLabel#detailValue {
+    color: #F3F5F8;
+    font-size: 14px;
+}
+
+QLabel#detailError {
+    color: #F28B82;
     font-size: 13px;
 }
 

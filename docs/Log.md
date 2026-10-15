@@ -3,7 +3,7 @@ title: Log
 tags:
   - log
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Log
@@ -24,3 +24,5 @@ updated: 2026-10-14
 - 2026-10-14: Discover filters search results with All, Installed, and Not installed. Installed and Updates load their own Microsoft Store lists and hide those filters.
 - 2026-10-15: Settings text wraps inside the card. About names Vanja Sretenovic and links to vanjasretenovic.com.
 - 2026-10-15: The search field starts empty. Discover opens with up to 10 featured Microsoft Store applications.
+- 2026-10-15: A card click opens an application page with Back, status, versions, and Launch, Uninstall, Update, or Install. Launch starts the installed Store application.
+- 2026-10-15: Launch uses `IApplicationActivationManager` on the window thread. `AppListEntry.LaunchAsync` from the search worker does not start the package.

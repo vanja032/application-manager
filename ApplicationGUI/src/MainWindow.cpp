@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "AppCard.h"
+#include "AppDetailPage.h"
 #include "UiIcons.h"
 
 #include <QtCore/QEvent>
@@ -167,6 +168,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(ui.searchEdit, &QLineEdit::returnPressed, this, [this]() { startSearch(); });
     connect(ui.sourceCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
     connect(ui.sortCombo, &QComboBox::currentTextChanged, this, [this](const QString &) { refreshAppList(); });
+
+    m_detailPage = new AppDetailPage(ui.pages);
+    ui.pages->addWidget(m_detailPage);
+    connect(m_detailPage, &AppDetailPage::backRequested, this, &MainWindow::closeDetail);
+    connect(m_detailPage, &AppDetailPage::installRequested, this, &MainWindow::startInstall, Qt::QueuedConnection);
+    connect(m_detailPage, &AppDetailPage::uninstallRequested, this, &MainWindow::startUninstall, Qt::QueuedConnection);
+    connect(m_detailPage, &AppDetailPage::updateRequested, this, &MainWindow::startUpdate, Qt::QueuedConnection);
+    connect(m_detailPage, &AppDetailPage::launchRequested, this, &MainWindow::startLaunch, Qt::QueuedConnection);
 }
 
 MainWindow::~MainWindow() = default;
@@ -385,6 +394,7 @@ void MainWindow::applyTheme(bool dark)
 
 void MainWindow::showSection(Section section)
 {
+    m_detailPackageId.clear();
     m_section = section;
     const bool discover = section == Section::Discover;
     const bool showList = discover || section == Section::Installed || section == Section::Updates;
@@ -751,6 +761,65 @@ void MainWindow::startUpdate(const QString &packageId)
         });
 }
 
+void MainWindow::startLaunch(const QString &packageId)
+{
+    if (m_detailPackageId == packageId)
+    {
+        m_detailPage->setLaunchError(QString());
+    }
+
+    m_service.LaunchAppAsync(packageId.toStdWString(), [this, packageId](LaunchCompletion completion) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, packageId, completion]() {
+                std::string error = completion.error;
+                if (error.empty())
+                {
+                    error = m_service.ActivateAppUserModelIds(completion.appUserModelIds);
+                }
+                if (error.empty())
+                {
+                    return;
+                }
+
+                if (m_detailPackageId != packageId)
+                {
+                    openDetail(packageId);
+                }
+                if (m_detailPackageId == packageId)
+                {
+                    m_detailPage->setLaunchError(QString::fromStdString(error));
+                }
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void MainWindow::openDetail(const QString &packageId)
+{
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return;
+    }
+
+    m_detailPackageId = packageId;
+    m_detailPage->setModel(card->model());
+    ui.searchRow->setVisible(false);
+    ui.filterRow->setVisible(false);
+    ui.pages->setCurrentWidget(m_detailPage);
+}
+
+void MainWindow::closeDetail()
+{
+    m_detailPackageId.clear();
+    const bool discover = m_section == Section::Discover;
+    const bool showList = discover || m_section == Section::Installed || m_section == Section::Updates;
+    ui.searchRow->setVisible(discover);
+    ui.filterRow->setVisible(showList);
+    ui.pages->setCurrentWidget(ui.pageList);
+}
+
 void MainWindow::showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
                                    int totalMb, const QString &errorText, bool retryUninstall, bool retryUpdate,
                                    const QString &installedVersion)
@@ -781,6 +850,10 @@ void MainWindow::showPackageStatus(const QString &packageId, AppAvailability ava
 
     card->applyStatus(availability, percent, downloadedMb, totalMb, errorText, retryUninstall, retryUpdate,
                       installedVersion);
+    if (m_detailPackageId == packageId)
+    {
+        m_detailPage->setModel(card->model());
+    }
     if (previous != availability)
     {
         refreshAppList();
@@ -880,6 +953,8 @@ void MainWindow::applySearchCompletion(const SearchCompletion &completion)
         connect(card, &AppCard::installRequested, this, &MainWindow::startInstall, Qt::QueuedConnection);
         connect(card, &AppCard::uninstallRequested, this, &MainWindow::startUninstall, Qt::QueuedConnection);
         connect(card, &AppCard::updateRequested, this, &MainWindow::startUpdate, Qt::QueuedConnection);
+        connect(card, &AppCard::launchRequested, this, &MainWindow::startLaunch, Qt::QueuedConnection);
+        connect(card, &AppCard::detailsRequested, this, &MainWindow::openDetail, Qt::QueuedConnection);
         m_cards.push_back(card);
     }
 

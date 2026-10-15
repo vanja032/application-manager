@@ -4,7 +4,7 @@ tags:
   - goal
   - assessment
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Production goal
@@ -32,9 +32,9 @@ A C++ Windows desktop application that behaves like the Microsoft Store. The GUI
 
 | Requirement | Status |
 | --- | --- |
-| Experience similar to the Microsoft Store for managing desktop software | Partial. Search shows live `msstore` results. Install, update, and uninstall are not wired. |
+| Experience similar to the Microsoft Store for managing desktop software | Partial. The GUI searches, installs, updates, uninstalls, and launches Microsoft Store applications, and opens a detail page. Pause and Cancel are not available. |
 | Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Partial. Discover searches the catalog. Installed lists installed Microsoft Store packages. An operation moves through Queued, Downloading, Installing or Updating, Installed, or Error. |
-| Search, inspect, and install applications from the Microsoft Store source | Partial. The GUI searches and installs through Core. The card shows install progress and Error. There is no separate inspect view. |
+| Search, inspect, and install applications from the Microsoft Store source | Met. Search and install go through Core. A card click opens a detail page with status, versions, and Launch, Uninstall, Update, or Install. |
 
 ### 2. Technology choice
 
@@ -57,7 +57,7 @@ These are in scope for the finished application.
 
 | Feature | Status |
 | --- | --- |
-| Launch an installed Microsoft Store app from the UI | Not met. |
+| Launch an installed Microsoft Store app from the UI | Met. Launch sits above Uninstall on an installed card and on the detail page. `LaunchAppAsync` starts the Store package for the current user. |
 | Uninstall from the application | Partial. The GUI uninstalls an installed Microsoft Store package and shows progress or Error. |
 | Detect available updates and apply them | Partial. Updates lists packages with `IsUpdateAvailable`. The GUI updates that card and shows progress or Error. |
 

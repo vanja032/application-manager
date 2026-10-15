@@ -40,6 +40,7 @@ struct AppCardModel
 class CircularProgress;
 class QHBoxLayout;
 class QLabel;
+class QMouseEvent;
 class QPushButton;
 
 class AppCard : public QWidget
@@ -58,6 +59,7 @@ class AppCard : public QWidget
 
     bool retriesUninstall() const;
     bool retriesUpdate() const;
+    const AppCardModel &model() const;
 
     void applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText,
                      bool retryUninstall = false, bool retryUpdate = false,
@@ -68,9 +70,13 @@ class AppCard : public QWidget
     void installRequested(const QString &packageId);
     void uninstallRequested(const QString &packageId);
     void updateRequested(const QString &packageId);
+    void launchRequested(const QString &packageId);
+    void detailsRequested(const QString &packageId);
 
   protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
   private:
     void rebuildStatusAndActions();

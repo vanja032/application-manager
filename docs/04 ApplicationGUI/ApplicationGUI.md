@@ -3,19 +3,20 @@ title: ApplicationGUI
 tags:
   - gui
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # ApplicationGUI
 
 Qt 6.12 Widgets application. The entry point is `src/main.cpp`: Fusion style when it is available, Segoe UI 10 pt, then `MainWindow`.
 
-The window calls [[WingetService]] for search only. Install, update, and uninstall stay in Core and are not connected to the buttons.
+The window calls [[WingetService]] for search, featured applications, the installed and update lists, install, update, uninstall, and launch.
 
 ## Parts
 
 - [[Main window]] — `include/MainWindow.h`, `src/MainWindow.cpp`, `ui/MainWindow.ui`
 - [[Application card]] — `AppCard`
+- [[Application detail]] — `AppDetailPage`
 - [[Circular progress]] — `CircularProgress`
 - [[Icons and theme]] — `UiIcons` and QSS
 - [[Mock catalog]] — removed; the list is filled from search results

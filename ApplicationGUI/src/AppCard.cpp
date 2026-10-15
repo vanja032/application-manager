@@ -3,6 +3,7 @@
 #include "CircularProgress.h"
 #include "UiIcons.h"
 
+#include <QtGui/QMouseEvent>
 #include <QtGui/QPainter>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
@@ -68,16 +69,19 @@ AppCard::AppCard(const AppCardModel &model, QWidget *parent) : QWidget(parent), 
 {
     setAttribute(Qt::WA_Hover, true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    setCursor(Qt::ArrowCursor);
+    setCursor(Qt::PointingHandCursor);
 
     auto *icon = new QLabel(this);
     icon->setObjectName(QStringLiteral("packageIcon"));
     icon->setFixedSize(48, 48);
     icon->setAlignment(Qt::AlignCenter);
+    icon->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     icon->setPixmap(UiIcons::pixmap(UiIcons::Glyph::Package, QColor(QStringLiteral("#8B919A")), 28));
 
     auto *name = makeLabel(m_model.name, QStringLiteral("appName"), this);
     auto *packageId = makeLabel(m_model.packageId, QStringLiteral("packageId"), this);
+    name->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    packageId->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
     auto *identity = new QVBoxLayout();
     identity->setContentsMargins(0, 0, 0, 0);
@@ -131,6 +135,11 @@ bool AppCard::retriesUninstall() const
 bool AppCard::retriesUpdate() const
 {
     return m_model.retryUpdate;
+}
+
+const AppCardModel &AppCard::model() const
+{
+    return m_model;
 }
 
 void AppCard::applyStatus(AppAvailability availability, int percent, int downloadedMb, int totalMb, const QString &errorText,
@@ -211,6 +220,7 @@ void AppCard::rebuildStatusAndActions()
     m_actionPanel = createActionPanel();
     m_layout->addWidget(m_statusPanel, 0, Qt::AlignVCenter);
     m_layout->addWidget(m_actionPanel, 0, Qt::AlignVCenter);
+    m_statusPanel->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     if (m_progress)
     {
         m_progress->setDarkMode(m_dark);
@@ -353,6 +363,10 @@ QWidget *AppCard::createActionPanel()
         connect(update, &QPushButton::clicked, this, [this]() { emit updateRequested(m_model.packageId); });
         column->addWidget(update);
 
+        auto *launch = createButton(QStringLiteral("Launch"), true);
+        connect(launch, &QPushButton::clicked, this, [this]() { emit launchRequested(m_model.packageId); });
+        column->addWidget(launch);
+
         auto *uninstall = createButton(QStringLiteral("Uninstall"), false);
         connect(uninstall, &QPushButton::clicked, this, [this]() { emit uninstallRequested(m_model.packageId); });
         column->addWidget(uninstall);
@@ -360,6 +374,10 @@ QWidget *AppCard::createActionPanel()
     else if (m_model.availability == AppAvailability::Installed ||
              (m_model.availability == AppAvailability::Error && m_model.retryUninstall))
     {
+        auto *launch = createButton(QStringLiteral("Launch"), true);
+        connect(launch, &QPushButton::clicked, this, [this]() { emit launchRequested(m_model.packageId); });
+        column->addWidget(launch);
+
         auto *uninstall = createButton(QStringLiteral("Uninstall"), false);
         connect(uninstall, &QPushButton::clicked, this, [this]() { emit uninstallRequested(m_model.packageId); });
         column->addWidget(uninstall);
@@ -382,4 +400,25 @@ QPushButton *AppCard::createButton(const QString &text, bool primary) const
     button->setFixedSize(112, 36);
     button->setFocusPolicy(Qt::NoFocus);
     return button;
+}
+
+void AppCard::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        event->accept();
+        return;
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
+void AppCard::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        emit detailsRequested(m_model.packageId);
+    }
+
+    QWidget::mouseReleaseEvent(event);
 }

@@ -3,7 +3,7 @@ title: WingetService
 tags:
   - core
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # WingetService
@@ -22,6 +22,7 @@ updated: 2026-10-14
 - `UninstallAppAsync(packageId, onProgress, onComplete)` returns immediately. A third Core worker runs uninstalls one at a time. Progress uses `UninstallProgressInfo`. `onComplete` receives an `UninstallCompletion` whose `error` is empty on success. A second request for a package that is already queued or running is ignored. Closing the service cancels the active operation and joins the worker.
 - `UpdateApp(packageId, onProgress)` blocks until update finishes. [[WingetPoC]] still uses this. `UpdateNotApplicable` returns without an error.
 - `UpdateAppAsync(packageId, onProgress, onComplete)` returns immediately. A fourth Core worker runs updates one at a time. Progress uses `UpdateProgressInfo`. `onComplete` receives an `UpdateCompletion` whose `error` is empty on success, including when the update is not applicable, and whose `installedVersion` is the version now installed. A second request for a package that is already queued or running is ignored. Closing the service cancels the active operation and joins the worker.
+- `LaunchAppAsync` uses the search worker to resolve the installed package. The callback receives a `LaunchCompletion` with `appUserModelIds`, or `error` when the package cannot be resolved. A newer search, list, or launch replaces a request that has not started. `ActivateAppUserModelIds` must run on the UI thread. It starts the package through `IApplicationActivationManager`.
 
 The callback is optional. Without it, the operation still waits until it finishes.
 
@@ -54,5 +55,11 @@ Uninstall uses a composite catalog so the installed package is visible. It requi
 Update builds a composite catalog from `msstore`, with behavior `RemotePackagesFromAllCatalogs`, so the installed version is visible. The package is looked up by id with option Equals. If there is no `InstalledVersion`, it throws "Package is not installed".
 
 `UpgradePackageAsync` receives `AllowUpgradeToUnknownVersion(true)`. If the result is not Ok and the extended code is `WingetErrors::UpdateNotApplicable` (`0x8A15002B`), the method returns the current `InstalledVersion` without throwing. Other failures throw the HRESULT. After Ok, the version is read again from the composite catalog, with `DefaultInstallVersion` as the fallback. `UpgradeVersionNotNewer` and `UpgradeVersionUnknown` are defined, but this path does not handle them separately.
+
+## Launch
+
+`LaunchAppAsync` looks up the package by id on the composite `msstore` catalog, the same Equals selector install uses. It requires `InstalledVersion` and reads every `PackageFamilyNames` entry. `Windows.Management.Deployment.PackageManager.FindPackagesForUser` finds each family for the current user. `GetAppListEntries` supplies `AppUserModelId` values. No family name, and no id, both throw "This application cannot be launched".
+
+The GUI then calls `ActivateAppUserModelIds` on the window thread. That creates `ApplicationActivationManager` with `CLSCTX_LOCAL_SERVER`, allows it to take the foreground, and calls `ActivateApplication` for each id until one succeeds. `AppListEntry.LaunchAsync` does not start the package from this desktop process.
 
 Related: [[AppInfo]], [[WingetErrors]], [[WingetPoC]], [[Store search]].

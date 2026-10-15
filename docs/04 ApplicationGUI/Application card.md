@@ -3,7 +3,7 @@ title: Application card
 tags:
   - gui
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Application card
@@ -14,7 +14,7 @@ updated: 2026-10-14
 
 `AppCardModel`: name, package ID, source, availability, installed version, available version, percent, downloaded MB, total MB, and `catalogIndex` for the Relevance sort.
 
-`AppAvailability`: NotInstalled, Installed, UpdateAvailable, Queued, Downloading, Installing, Updating, UninstallQueued, Uninstalling, UpdateQueued, UpdateDownloading, Error. `errorText` is the failure message. `retryUninstall` chooses an Uninstall button after a failed removal. `retryUpdate` chooses Update and Uninstall after a failed update.
+`AppAvailability`: NotInstalled, Installed, UpdateAvailable, Queued, Downloading, Installing, Updating, UninstallQueued, Uninstalling, UpdateQueued, UpdateDownloading, Error. `errorText` is the failure message. `retryUninstall` chooses Launch and Uninstall after a failed removal. `retryUpdate` chooses Update, Launch, and Uninstall after a failed update.
 
 ## Layout
 
@@ -26,6 +26,8 @@ Status:
 - Error: a red dot, the title Error, and the message wrapped in the status column.
 - Everything else: a row with a 16 px icon and the title, then details indented by 24 px. The check and the update icon are the same size and aligned with the first line. The Not installed dot sits vertically with that text. Installed shows `Version` plus `installedVersion`, or `Version unknown` when that string is empty. Update available shows the installed and available version lines.
 
-Action: primary and secondary buttons, 112×36. Not installed and an install Error emit `installRequested`. Installed, and an uninstall Error, emit `uninstallRequested`. Update available, and an update Error, emit `updateRequested` and `uninstallRequested`. There is no Cancel while a package is queued, downloading, installing, updating, or uninstalling.
+Action: primary and secondary buttons, 112×36. Not installed and an install Error emit `installRequested`. Installed, and an uninstall Error, emit `launchRequested` and `uninstallRequested`. Update available, and an update Error, emit `updateRequested`, `launchRequested`, and `uninstallRequested`. Launch uses the same primary button as Install and sits above Uninstall. There is no Cancel while a package is queued, downloading, installing, updating, or uninstalling.
 
-Related: [[Mock catalog]].
+A left click on the card, outside those buttons, emits `detailsRequested`. The icon, name, package id, and status panel ignore the mouse so that click reaches the card. The action panel does not, so the buttons keep their own clicks. The card uses a pointing-hand cursor.
+
+Related: [[Application detail]], [[Mock catalog]].

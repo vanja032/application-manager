@@ -82,6 +82,12 @@ struct UpdateCompletion
     std::wstring installedVersion;
 };
 
+struct LaunchCompletion
+{
+    std::string error;
+    std::vector<std::wstring> appUserModelIds;
+};
+
 class WingetService
 {
   public:
@@ -92,6 +98,7 @@ class WingetService
     using InstallCallback = std::function<void(InstallCompletion)>;
     using UninstallCallback = std::function<void(UninstallCompletion)>;
     using UpdateCallback = std::function<void(UpdateCompletion)>;
+    using LaunchCallback = std::function<void(LaunchCompletion)>;
 
     WingetService();
     ~WingetService();
@@ -122,13 +129,17 @@ class WingetService
     void UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress = {}) const;
     void UpdateAppAsync(const std::wstring &packageId, UpdateProgressCallback onProgress, UpdateCallback onComplete);
 
+    std::string ActivateAppUserModelIds(const std::vector<std::wstring> &appUserModelIds) const;
+    void LaunchAppAsync(const std::wstring &packageId, LaunchCallback callback);
+
   private:
     enum class CatalogRequest
     {
         Search,
         Featured,
         Installed,
-        Updates
+        Updates,
+        Launch
     };
 
     struct SearchRequest
@@ -136,6 +147,7 @@ class WingetService
         CatalogRequest kind = CatalogRequest::Search;
         std::wstring query;
         SearchCallback callback;
+        LaunchCallback onLaunch;
     };
 
     struct InstallRequest
@@ -170,6 +182,7 @@ class WingetService
                           std::function<void(std::function<void()>)> armCancel) const;
     std::wstring updatePackage(const std::wstring &packageId, UpdateProgressCallback onProgress,
                                std::function<void(std::function<void()>)> armCancel) const;
+    std::vector<std::wstring> findAppUserModelIds(const std::wstring &packageId) const;
 
     std::mutex m_mutex;
     std::condition_variable m_cv;

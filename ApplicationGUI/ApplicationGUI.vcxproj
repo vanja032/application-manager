@@ -106,10 +106,12 @@
     <QtUic Include="ui\MainWindow.ui" />
     <QtMoc Include="include\MainWindow.h" />
     <QtMoc Include="include\AppCard.h" />
+    <QtMoc Include="include\AppDetailPage.h" />
     <QtMoc Include="include\CircularProgress.h" />
     <ClCompile Include="src\MainWindow.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\AppCard.cpp" />
+    <ClCompile Include="src\AppDetailPage.cpp" />
     <ClCompile Include="src\CircularProgress.cpp" />
     <ClCompile Include="src\UiIcons.cpp" />
     <ClCompile Include="src\AnchoredComboBox.cpp" />

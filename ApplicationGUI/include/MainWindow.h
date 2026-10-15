@@ -19,6 +19,7 @@ class QLabel;
 class QShowEvent;
 class QToolButton;
 class ToggleSwitch;
+class AppDetailPage;
 
 class MainWindow : public QMainWindow
 {
@@ -61,6 +62,9 @@ class MainWindow : public QMainWindow
     void startInstall(const QString &packageId);
     void startUninstall(const QString &packageId);
     void startUpdate(const QString &packageId);
+    void startLaunch(const QString &packageId);
+    void openDetail(const QString &packageId);
+    void closeDetail();
     void showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
                            int totalMb, const QString &errorText, bool retryUninstall = false,
                            bool retryUpdate = false, const QString &installedVersion = QString());
@@ -101,5 +105,7 @@ class MainWindow : public QMainWindow
     std::uint64_t m_searchGeneration = 0;
     QString m_statusText;
     QHash<QString, InstallUiState> m_installUi;
+    QString m_detailPackageId;
+    AppDetailPage *m_detailPage = nullptr;
     WingetService m_service;
 };

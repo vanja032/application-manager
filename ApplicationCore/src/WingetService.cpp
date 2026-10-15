@@ -4,9 +4,20 @@
 #include "WingetErrors.h"
 
 #include <winrt/Microsoft.Management.Deployment.h>
+#include <winrt/Windows.ApplicationModel.h>
+#include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Management.Deployment.h>
 
 #include <winrt/base.h>
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <ShObjIdl_core.h>
+#include <objbase.h>
+#undef min
+#undef max
 
 #include <algorithm>
 #include <cmath>
@@ -259,6 +270,29 @@ void WingetService::workerMain()
             m_pending.reset();
         }
 
+        if (request.kind == CatalogRequest::Launch)
+        {
+            LaunchCompletion completion;
+            try
+            {
+                completion.appUserModelIds = findAppUserModelIds(request.query);
+            }
+            catch (const winrt::hresult_error &ex)
+            {
+                completion.error = winrt::to_string(ex.message());
+            }
+            catch (const std::exception &ex)
+            {
+                completion.error = ex.what();
+            }
+
+            if (request.onLaunch)
+            {
+                request.onLaunch(std::move(completion));
+            }
+            continue;
+        }
+
         SearchCompletion completion;
         try
         {
@@ -440,6 +474,155 @@ void WingetService::ListFeaturedAppsAsync(SearchCallback callback)
     {
         std::lock_guard lock(m_mutex);
         m_pending = SearchRequest{CatalogRequest::Featured, {}, std::move(callback)};
+    }
+
+    m_cv.notify_one();
+}
+
+std::vector<std::wstring> WingetService::findAppUserModelIds(const std::wstring &packageId) const
+{
+    deployment::PackageManager manager;
+
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
+    {
+        throw std::runtime_error("msstore catalog not found");
+    }
+
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
+    if (connection.Status() != deployment::ConnectResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to connect to composite catalog");
+    }
+
+    deployment::FindPackagesOptions options;
+    deployment::PackageMatchFilter filter;
+    filter.Field(deployment::PackageMatchField::Id);
+    filter.Option(deployment::PackageFieldMatchOption::Equals);
+    filter.Value(packageId);
+    options.Selectors().Append(filter);
+
+    auto result = connection.PackageCatalog().FindPackages(options);
+    if (result.Status() != deployment::FindPackagesResultStatus::Ok || result.Matches().Size() == 0)
+    {
+        throw std::runtime_error("Package not found");
+    }
+
+    auto package = result.Matches().GetAt(0).CatalogPackage();
+    auto installed = package.InstalledVersion();
+    if (!installed)
+    {
+        throw std::runtime_error("Package is not installed");
+    }
+
+    auto familyNames = installed.PackageFamilyNames();
+    if (!familyNames || familyNames.Size() == 0)
+    {
+        throw std::runtime_error("This application cannot be launched");
+    }
+
+    std::vector<std::wstring> ids;
+    winrt::Windows::Management::Deployment::PackageManager userPackages;
+    for (uint32_t index = 0; index < familyNames.Size(); ++index)
+    {
+        auto matches = userPackages.FindPackagesForUser(L"", familyNames.GetAt(index));
+        for (const auto &installedPackage : matches)
+        {
+            winrt::Windows::Foundation::Collections::IVectorView<winrt::Windows::ApplicationModel::Core::AppListEntry>
+                entries{nullptr};
+            try
+            {
+                entries = installedPackage.GetAppListEntries();
+            }
+            catch (const winrt::hresult_error &)
+            {
+                continue;
+            }
+
+            if (!entries)
+            {
+                continue;
+            }
+
+            for (const auto &entry : entries)
+            {
+                const std::wstring id = entry.AppUserModelId().c_str();
+                if (id.empty() || std::find(ids.begin(), ids.end(), id) != ids.end())
+                {
+                    continue;
+                }
+
+                ids.push_back(id);
+            }
+        }
+    }
+
+    if (ids.empty())
+    {
+        throw std::runtime_error("This application cannot be launched");
+    }
+
+    return ids;
+}
+
+std::string WingetService::ActivateAppUserModelIds(const std::vector<std::wstring> &appUserModelIds) const
+{
+    if (appUserModelIds.empty())
+    {
+        return "This application cannot be launched";
+    }
+
+    IApplicationActivationManager *activator = nullptr;
+    const HRESULT created = CoCreateInstance(__uuidof(ApplicationActivationManager), nullptr, CLSCTX_LOCAL_SERVER,
+                                             IID_PPV_ARGS(&activator));
+    if (FAILED(created))
+    {
+        return winrt::to_string(winrt::hresult_error(created).message());
+    }
+
+    struct Releaser
+    {
+        IApplicationActivationManager *pointer = nullptr;
+        ~Releaser()
+        {
+            if (pointer)
+            {
+                pointer->Release();
+            }
+        }
+    } releaser{activator};
+
+    CoAllowSetForegroundWindow(activator, nullptr);
+
+    HRESULT last = E_FAIL;
+    for (const std::wstring &id : appUserModelIds)
+    {
+        DWORD processId = 0;
+        last = activator->ActivateApplication(id.c_str(), nullptr, AO_NOERRORUI, &processId);
+        if (SUCCEEDED(last))
+        {
+            return {};
+        }
+    }
+
+    return winrt::to_string(winrt::hresult_error(last).message());
+}
+
+void WingetService::LaunchAppAsync(const std::wstring &packageId, LaunchCallback callback)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_pending = SearchRequest{CatalogRequest::Launch, packageId, {}, std::move(callback)};
     }
 
     m_cv.notify_one();

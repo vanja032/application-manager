@@ -41,6 +41,9 @@
     <ClCompile Include="src\AppCard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\AppDetailPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\CircularProgress.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -51,6 +54,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <QtMoc Include="include\AppCard.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="include\AppDetailPage.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="include\CircularProgress.h">
