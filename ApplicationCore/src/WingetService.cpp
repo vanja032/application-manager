@@ -270,6 +270,10 @@ void WingetService::workerMain()
             {
                 completion.apps = ListUpdates();
             }
+            else if (request.kind == CatalogRequest::Featured)
+            {
+                completion.apps = ListFeaturedApps();
+            }
             else
             {
                 completion.apps = SearchApps(request.query);
@@ -352,6 +356,93 @@ std::vector<AppInfo> WingetService::SearchApps(const std::wstring &query) const
     }
 
     return apps;
+}
+
+std::vector<AppInfo> WingetService::ListFeaturedApps() const
+{
+    deployment::PackageManager manager;
+
+    auto storeCatalog = manager.GetPackageCatalogByName(L"msstore");
+    if (!storeCatalog)
+    {
+        throw std::runtime_error("msstore catalog not found");
+    }
+
+    deployment::CreateCompositePackageCatalogOptions compositeOptions;
+    compositeOptions.Catalogs().Append(storeCatalog);
+    compositeOptions.CompositeSearchBehavior(deployment::CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto compositeCatalog = manager.CreateCompositePackageCatalog(compositeOptions);
+    if (!compositeCatalog)
+    {
+        throw std::runtime_error("Failed to create composite catalog");
+    }
+
+    auto connection = compositeCatalog.Connect();
+    if (connection.Status() != deployment::ConnectResultStatus::Ok)
+    {
+        throw std::runtime_error("Failed to connect to composite catalog");
+    }
+
+    static constexpr const wchar_t *kFeaturedNames[] = {
+        L"WhatsApp", L"Spotify", L"Netflix", L"Instagram", L"TikTok", L"Discord",
+        L"Telegram", L"Zoom",    L"Disney",  L"Prime Video", L"Adobe Acrobat", L"Facebook"};
+
+    auto catalog = connection.PackageCatalog();
+    std::vector<AppInfo> apps;
+    for (const wchar_t *name : kFeaturedNames)
+    {
+        if (apps.size() >= 10)
+        {
+            break;
+        }
+
+        deployment::FindPackagesOptions options;
+        deployment::PackageMatchFilter filter;
+        filter.Field(deployment::PackageMatchField::Name);
+        filter.Option(deployment::PackageFieldMatchOption::ContainsCaseInsensitive);
+        filter.Value(name);
+        options.Filters().Append(filter);
+        options.ResultLimit(1);
+
+        auto result = catalog.FindPackages(options);
+        if (result.Status() != deployment::FindPackagesResultStatus::Ok || result.Matches().Size() == 0)
+        {
+            continue;
+        }
+
+        AppInfo app = appFromPackage(result.Matches().GetAt(0).CatalogPackage());
+        if (app.id.empty())
+        {
+            continue;
+        }
+
+        bool seen = false;
+        for (const AppInfo &existing : apps)
+        {
+            if (existing.id == app.id)
+            {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen)
+        {
+            apps.push_back(std::move(app));
+        }
+    }
+
+    return apps;
+}
+
+void WingetService::ListFeaturedAppsAsync(SearchCallback callback)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_pending = SearchRequest{CatalogRequest::Featured, {}, std::move(callback)};
+    }
+
+    m_cv.notify_one();
 }
 
 std::vector<AppInfo> WingetService::ListInstalledApps() const

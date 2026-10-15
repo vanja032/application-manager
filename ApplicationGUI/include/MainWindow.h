@@ -55,6 +55,7 @@ class MainWindow : public QMainWindow
     void applyTheme(bool dark);
     void showSection(Section section);
     void startSearch();
+    void startFeaturedList();
     void startInstalledList();
     void startUpdatesList();
     void startInstall(const QString &packageId);

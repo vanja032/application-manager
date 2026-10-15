@@ -22,3 +22,5 @@ updated: 2026-10-14
 - 2026-10-14: Update from the GUI calls `UpdateAppAsync` on its own Core worker. Search uses `IsUpdateAvailable` to show Update available.
 - 2026-10-14: After install or update, the card version comes from a composite-catalog lookup in the sync install and update path. The remote install package does not fill `InstalledVersion`.
 - 2026-10-14: Discover filters search results with All, Installed, and Not installed. Installed and Updates load their own Microsoft Store lists and hide those filters.
+- 2026-10-15: Settings text wraps inside the card. About names Vanja Sretenovic and links to vanjasretenovic.com.
+- 2026-10-15: The search field starts empty. Discover opens with up to 10 featured Microsoft Store applications.

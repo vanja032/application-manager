@@ -342,6 +342,8 @@ void MainWindow::applyTheme(bool dark)
         palette.setColor(QPalette::ButtonText, QColor(QStringLiteral("#1A1A1A")));
         palette.setColor(QPalette::Highlight, QColor(QStringLiteral("#0078D4")));
         palette.setColor(QPalette::HighlightedText, Qt::white);
+        palette.setColor(QPalette::Link, QColor(QStringLiteral("#0078D4")));
+        palette.setColor(QPalette::LinkVisited, QColor(QStringLiteral("#0078D4")));
         palette.setColor(QPalette::PlaceholderText, QColor(QStringLiteral("#8D939C")));
     }
     else
@@ -355,11 +357,18 @@ void MainWindow::applyTheme(bool dark)
         palette.setColor(QPalette::ButtonText, QColor(QStringLiteral("#F3F5F8")));
         palette.setColor(QPalette::Highlight, QColor(QStringLiteral("#4DA3FF")));
         palette.setColor(QPalette::HighlightedText, Qt::white);
+        palette.setColor(QPalette::Link, QColor(QStringLiteral("#4DA3FF")));
+        palette.setColor(QPalette::LinkVisited, QColor(QStringLiteral("#4DA3FF")));
         palette.setColor(QPalette::PlaceholderText, QColor(QStringLiteral("#9AA3B2")));
     }
 
     qApp->setPalette(palette);
     qApp->setStyleSheet(loadStyleSheet(dark ? QStringLiteral(":/styles-dark.qss") : QStringLiteral(":/styles.qss")));
+
+    const QString linkColor = dark ? QStringLiteral("#4DA3FF") : QStringLiteral("#0078D4");
+    ui.aboutLink->setText(
+        QStringLiteral("<a href=\"https://vanjasretenovic.com\" style=\"color:%1;\">vanjasretenovic.com</a>")
+            .arg(linkColor));
 
     if (m_darkModeSwitch)
     {
@@ -417,28 +426,45 @@ void MainWindow::showSection(Section section)
     }
     else
     {
-        m_loadedSection = Section::Discover;
-        m_listLoaded = true;
-        showStatus(QStringLiteral("No applications match your search."));
+        startFeaturedList();
     }
 }
 
 void MainWindow::startSearch()
 {
-    const std::uint64_t generation = ++m_searchGeneration;
     const QString query = ui.searchEdit->text().trimmed();
     if (query.isEmpty())
     {
-        m_loadedSection = Section::Discover;
-        m_listLoaded = true;
-        showStatus(QStringLiteral("No applications match your search."));
+        startFeaturedList();
         return;
     }
 
+    const std::uint64_t generation = ++m_searchGeneration;
     m_listLoaded = false;
     showStatus(QStringLiteral("Searching..."));
 
     m_service.SearchAppsAsync(query.toStdWString(), [this, generation](SearchCompletion completion) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, generation, completion]() {
+                if (generation != m_searchGeneration)
+                {
+                    return;
+                }
+
+                applySearchCompletion(completion);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void MainWindow::startFeaturedList()
+{
+    const std::uint64_t generation = ++m_searchGeneration;
+    m_listLoaded = false;
+    showStatus(QStringLiteral("Loading featured applications..."));
+
+    m_service.ListFeaturedAppsAsync([this, generation](SearchCompletion completion) {
         QMetaObject::invokeMethod(
             this,
             [this, generation, completion]() {
@@ -1001,6 +1027,13 @@ QString MainWindow::emptyListMessage() const
     if (m_filterGroup->checkedId() == static_cast<int>(StatusFilter::NotInstalled))
     {
         return QStringLiteral("No applications to install match your search.");
+    }
+
+    if (m_section == Section::Discover && ui.searchEdit->text().trimmed().isEmpty() &&
+        m_filterGroup->checkedId() != static_cast<int>(StatusFilter::Installed) &&
+        m_filterGroup->checkedId() != static_cast<int>(StatusFilter::NotInstalled))
+    {
+        return QStringLiteral("No featured applications are available.");
     }
 
     return QStringLiteral("No applications match your search.");

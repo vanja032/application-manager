@@ -399,9 +399,25 @@ QLabel#settingsCatalogHeading {
 
 QLabel#settingsAppearanceBody,
 QLabel#settingsCatalogBody,
-QLabel#aboutBody {
+QLabel#aboutBody,
+QLabel#aboutDeveloped {
     color: #5C6570;
     font-size: 13px;
+}
+
+QLabel#aboutName {
+    color: #1A1A1A;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QLabel#aboutLink {
+    font-size: 13px;
+}
+
+QFrame#aboutRule {
+    background: #E4E8EF;
+    border: none;
 }
 
 QScrollArea#appScrollArea QScrollBar:vertical {

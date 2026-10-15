@@ -373,9 +373,6 @@
             <property name="placeholderText">
              <string>Search applications</string>
             </property>
-            <property name="text">
-             <string>whatsapp</string>
-            </property>
             <property name="clearButtonEnabled">
              <bool>true</bool>
             </property>
@@ -695,7 +692,12 @@
              </property>
             </widget>
            </item>
-           <item alignment="Qt::AlignLeft|Qt::AlignTop">
+           <item>
+            <layout class="QHBoxLayout" name="settingsCardRow">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
             <widget class="QFrame" name="settingsCard">
              <property name="minimumSize">
               <size>
@@ -740,6 +742,12 @@
                 <property name="wordWrap">
                  <bool>true</bool>
                 </property>
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                </widget>
               </item>
               <item>
@@ -773,10 +781,31 @@
                 <property name="wordWrap">
                  <bool>true</bool>
                 </property>
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                </widget>
               </item>
              </layout>
             </widget>
+             </item>
+             <item>
+              <spacer name="settingsCardRowSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </item>
            <item>
             <spacer name="settingsSpacer">
@@ -840,7 +869,12 @@
              </property>
             </widget>
            </item>
-           <item alignment="Qt::AlignLeft|Qt::AlignTop">
+           <item>
+            <layout class="QHBoxLayout" name="aboutCardRow">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
             <widget class="QFrame" name="aboutCard">
              <property name="minimumSize">
               <size>
@@ -855,6 +889,9 @@
               </size>
              </property>
              <layout class="QVBoxLayout" name="aboutCardLayout">
+              <property name="spacing">
+               <number>8</number>
+              </property>
               <property name="leftMargin">
                <number>20</number>
               </property>
@@ -870,15 +907,137 @@
               <item>
                <widget class="QLabel" name="aboutBody">
                 <property name="text">
-                 <string>Discover Windows applications, see what is already installed, and review updates from one place.</string>
+                 <string>Search the Microsoft Store, then install, update, or remove applications from this window.</string>
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>
+                </property>
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="aboutCreditSpacer">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Fixed</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>0</width>
+                  <height>8</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QFrame" name="aboutRule">
+                <property name="frameShape">
+                 <enum>QFrame::NoFrame</enum>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>1</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>1</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="aboutCreditSpacerBottom">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Fixed</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>0</width>
+                  <height>8</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="aboutCreditRow">
+                <property name="spacing">
+                 <number>6</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="aboutDeveloped">
+                  <property name="text">
+                   <string>Developed by</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="aboutName">
+                  <property name="text">
+                   <string>Vanja Sretenovic</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="aboutCreditRowSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>0</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="aboutLink">
+                <property name="text">
+                 <string>&lt;a href="https://vanjasretenovic.com"&gt;vanjasretenovic.com&lt;/a&gt;</string>
+                </property>
+                <property name="textFormat">
+                 <enum>Qt::RichText</enum>
+                </property>
+                <property name="openExternalLinks">
+                 <bool>true</bool>
+                </property>
+                <property name="cursor">
+                 <cursorShape>PointingHandCursor</cursorShape>
                 </property>
                </widget>
               </item>
              </layout>
             </widget>
+             </item>
+             <item>
+              <spacer name="aboutCardRowSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </item>
            <item>
             <spacer name="aboutSpacer">

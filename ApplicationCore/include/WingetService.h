@@ -104,6 +104,9 @@ class WingetService
     std::vector<AppInfo> SearchApps(const std::wstring &query) const;
     void SearchAppsAsync(const std::wstring &query, SearchCallback callback);
 
+    std::vector<AppInfo> ListFeaturedApps() const;
+    void ListFeaturedAppsAsync(SearchCallback callback);
+
     std::vector<AppInfo> ListInstalledApps() const;
     void ListInstalledAppsAsync(SearchCallback callback);
 
@@ -123,6 +126,7 @@ class WingetService
     enum class CatalogRequest
     {
         Search,
+        Featured,
         Installed,
         Updates
     };

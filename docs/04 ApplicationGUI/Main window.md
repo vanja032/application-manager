@@ -20,7 +20,7 @@ Updates carries a badge, a child of the button, 22×22, transparent to the mouse
 
 ## Content
 
-Search row: the field and a Search button, 104×40. The field is `QFrame#searchFrame` (margins 16 and 14, spacing 10, height 40) with an icon, a plain `QLineEdit`, and `QToolButton#searchClearButton`. The built-in clear button is disabled. The X is visible when the text is not empty, uses `PointingHandCursor`, and clears the field. Focus on the frame is the dynamic property `focused`, so QSS changes the border. The initial text is `whatsapp`, and the window starts that search on launch. Search and Enter call `SearchAppsAsync`. Results are applied with `QMetaObject::invokeMethod` and `Qt::QueuedConnection`. A generation counter drops a result when a newer search has already started. While the search runs, the list shows "Searching...". Failure shows the error text. No matches show "No applications match your search."
+Search row: the field and a Search button, 104×40. The field is `QFrame#searchFrame` (margins 16 and 14, spacing 10, height 40) with an icon, a plain `QLineEdit`, and `QToolButton#searchClearButton`. The built-in clear button is disabled. The X is visible when the text is not empty, uses `PointingHandCursor`, and clears the field. Focus on the frame is the dynamic property `focused`, so QSS changes the border. The field starts empty. Discover then calls `ListFeaturedAppsAsync` and shows up to 10 well-known Microsoft Store applications. Search and Enter call `SearchAppsAsync`. An empty search returns to that featured list. Results are applied with `QMetaObject::invokeMethod` and `Qt::QueuedConnection`. A generation counter drops a result when a newer search has already started. While a search runs, the list shows "Searching...". The featured load shows "Loading featured applications...". Failure shows the error text. No search matches show "No applications match your search."
 
 Each result card has a status. `InstalledVersion` from the composite catalog chooses Installed or Not installed. `IsUpdateAvailable` chooses Update available. Install calls `InstallAppAsync` and does not block the window. The card then shows Queued, Downloading with megabytes, Installing, Installed, or Error. The Installed panel uses the version from `InstallCompletion`, so it does not wait for another search. Uninstall calls `UninstallAppAsync`. That card shows Queued, Uninstalling, Not installed, or Error with Uninstall again. Update calls `UpdateAppAsync`. That card shows Queued, Downloading, Updating, Installed with the version from `UpdateCompletion`, or Error with Update again. A result that is not applicable stays Installed and keeps the current version. Progress and the final result are applied on the UI thread. A new search keeps that state for the same package id, including a version the catalog has not returned yet.
 
@@ -32,7 +32,9 @@ Filters, on Discover only: All, Installed, and Not installed. Installed keeps In
 
 An empty list shows a label instead of the scroll area. Discover says nothing matched the search. Installed says there are no installed applications. Updates says there are no updates.
 
-The Settings text says the catalog uses the Microsoft Store and that search matches the application name and package ID.
+The Settings text says the catalog uses the Microsoft Store and that search matches the application name and package ID. The card grows with wrapped lines, so that sentence stays readable.
+
+About shows the product name, version, a short description, Developed by Vanja Sretenovic, and a link to https://vanjasretenovic.com. The link opens in the browser.
 
 ## Filtering
 
