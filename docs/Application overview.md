@@ -3,7 +3,7 @@ title: Application overview
 tags:
   - overview
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Application overview
@@ -14,10 +14,10 @@ Three projects in `ApplicationManager.sln` split that work:
 
 | Project | Role | State |
 | --- | --- | --- |
-| [[ApplicationCore]] | Static library. Search and package operations. | Search, install, update, and uninstall run against `msstore`. |
+| [[ApplicationCore]] | Static library. Search and package operations. | Search, featured apps, installed and update lists, install, update, uninstall, and launch lookup run against `msstore`. |
 | [[WingetPoC]] | Console proof that the service works. | Manual flow for the first `whatsapp` search hit. |
-| [[ApplicationGUI]] | Qt Widgets interface. | Search calls `SearchAppsAsync`. Install, update, and uninstall are not connected. |
+| [[ApplicationGUI]] | Qt Widgets interface. | Search, install, update, uninstall, launch, and the application page call `WingetService`. |
 
-ApplicationGUI references ApplicationCore. The window calls `SearchAppsAsync` only.
+ApplicationGUI references ApplicationCore. The window calls the async service methods and keeps the COM work off the UI thread. The root `README.md` is the public description.
 
 Related: [[Production goal]], [[Solution]], [[Decision 0001 UI before backend]], [[Decision 0002 Microsoft Store only]], [[Decision 0006 Stack]], [[Store search]].

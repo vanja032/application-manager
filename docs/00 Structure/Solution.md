@@ -3,12 +3,12 @@ title: Solution
 tags:
   - structure
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Solution
 
-`ApplicationManager.sln` is a Visual Studio 2022 solution, format 12.00. The build tool is MSBuild, toolset v143. The language is C++20 where Debug|x64 sets it explicitly.
+`ApplicationManager.sln` is a Visual Studio 2022 solution, format 12.00. The build tool is MSBuild, toolset v143. ApplicationCore and WingetPoC set C++20 on Debug and Release, Win32 and x64. ApplicationGUI sets C++20 on Debug|x64 and Release|x64. None of the projects use a precompiled header.
 
 Projects, in solution order:
 

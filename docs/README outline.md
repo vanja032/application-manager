@@ -3,12 +3,12 @@ title: README outline
 tags:
   - readme
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # README outline
 
-This is not the README. It is the contents the root README should cover once the vault is dense enough. Each item already has a source note.
+The root `README.md` was written from this outline on 2026-10-15. This note stays as the map of those sections. Each item already has a source note.
 
 The assessment deliverable needs these sections first. Source: [[Production goal]], [[Decision 0006 Stack]], [[Build]].
 
@@ -28,4 +28,4 @@ Then:
 8. Known limits. Source: [[Open questions]].
 9. How Store search treats common words, and the search advantages this app can still add. Source: [[Store search]].
 
-Write the README only when these items are no longer just an outline. The language is English.
+The root README is English.

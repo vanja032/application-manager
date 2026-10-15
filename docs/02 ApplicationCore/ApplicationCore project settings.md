@@ -4,22 +4,19 @@ tags:
   - core
   - build
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # ApplicationCore project settings
 
 `ApplicationCore.vcxproj`. The project type is a static library.
 
-Debug|x64, the configuration in use:
+Debug|Win32, Debug|x64, Release|Win32, and Release|x64:
 
 - C++20 (`stdcpp20`)
-- no precompiled header (`NotUsing`)
+- no precompiled header (`NotUsing`). There is no `pch.h` in the tree.
 - `AdditionalIncludeDirectories`: `$(ProjectDir)include`
-- output `x64/Debug/ApplicationCore.lib` when built from the solution
 
-Release|x64 still has `PrecompiledHeader` set to Use and file `pch.h`. That file is not among the sources. Recorded in [[Open questions]].
-
-Win32 configurations exist because of the solution x86 platform and are not aligned with Debug|x64.
+Output is `x64/Debug/ApplicationCore.lib` when Debug|x64 is built from the solution. Release|x64 writes `x64/Release/ApplicationCore.lib`. Win32 configurations exist because of the solution x86 platform and use the same compiler settings.
 
 Related: [[Folder layout]].

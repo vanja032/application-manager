@@ -29,3 +29,7 @@ updated: 2026-10-15
 - 2026-10-15: Install and update can be paused or cancelled from the card and the application page. Pause cancels the active operation and Resume starts it again. See [[Decision 0007 Pause]].
 - 2026-10-15: Pause and Cancel hide once an install or update reaches Installing or Updating, because cancellation no longer stops the installer.
 - 2026-10-15: Recorded that `msstore` install and update progress skips Downloading and reports `DownloadProgress` as 1 while the state is Installing. Pause and Cancel therefore often do not appear. No code change.
+- 2026-10-15: ApplicationCore and WingetPoC use C++20 and the same include paths on Debug and Release, Win32 and x64. Precompiled headers are off. There is no `pch.h`.
+- 2026-10-15: Root `README.md` written from [[README outline]]. It covers prerequisites, the Debug and Release x64 build, the winget and Qt split, and the known Store limits.
+- 2026-10-15: Release `ApplicationGUI.exe` is started from `x64/Release` after `windeployqt` copies the Qt DLLs beside it. The root README has the full steps, including the Visual C++ runtime when `VCINSTALLDIR` is unset.
+- 2026-10-15: Decision 0002 no longer describes a mock catalog. Discover, Installed, and Updates use `msstore` only.

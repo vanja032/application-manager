@@ -4,7 +4,7 @@ tags:
   - decisions
   - architecture
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Decision 0006 Stack
@@ -21,4 +21,4 @@ The UI framework is Qt 6.12 Widgets, Visual Studio 2022, toolset v143, C++20. La
 
 ## Consequence
 
-[[ApplicationCore]] owns the COM calls. [[ApplicationGUI]] must call that library asynchronously so the window never blocks. That wiring is still open. See [[Production goal]] and [[Open questions]].
+[[ApplicationCore]] owns the COM calls. [[ApplicationGUI]] calls that library on worker threads and applies results on the window thread. See [[Production goal]] and the root `README.md`.

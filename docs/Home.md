@@ -3,12 +3,12 @@ title: Home
 tags:
   - index
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Home
 
-Working notes for Windows App Manager. This folder is the Obsidian vault. The repository root does not have a README yet. These notes will later become one detailed README file.
+Working notes for Windows App Manager. This folder is the Obsidian vault. The public description is the root `README.md`.
 
 ## Map
 

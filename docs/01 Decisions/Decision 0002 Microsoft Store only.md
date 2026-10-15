@@ -4,7 +4,7 @@ tags:
   - decisions
   - winget
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Decision 0002 Microsoft Store only
@@ -15,10 +15,8 @@ Both the backend and the visible GUI work with the Microsoft Store catalog.
 
 ## Choice
 
-`WingetService` opens the `msstore` catalog. The GUI source combo offers only Microsoft Store. All sources and winget are not in the combo box. The Updates badge counts only packages whose source is Microsoft Store and whose status is Update available.
-
-The mock catalog still contains winget packages (Visual Studio Code, Firefox, PowerToys, VLC), but the source filter does not show them.
+`WingetService` opens the `msstore` catalog. The GUI offers only Microsoft Store. Search, the featured list, Installed, and Updates all use that catalog. There is no mock catalog.
 
 ## Consequence
 
-A `whatsapp` search on the initial screen shows six Store cards. The badge shows 2: WhatsApp Business and Spotify.
+Discover, Installed, and Updates show Microsoft Store packages only. The window does not list winget packages such as Visual Studio Code or Firefox.
