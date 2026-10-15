@@ -4,6 +4,8 @@ Windows App Manager is a desktop application for finding, installing, updating, 
 
 The window searches the live `msstore` catalog, shows up to ten featured applications when the search field is empty, and keeps install, update, and uninstall progress off the UI thread. An installed package can be launched from its card or from its own page.
 
+![Windows App Manager on Discover, with featured Microsoft Store applications](docs/images/discover.png)
+
 ## Prerequisites and dependencies
 
 - Windows 10 or Windows 11, with the Microsoft Store source available to Windows Package Manager (App Installer).
@@ -146,3 +148,10 @@ Light theme is the default. Dark mode is a switch in the sidebar. Both themes us
 Search sends the query as typed. The filter is the package name, case-insensitive contains, with a limit of ten. The catalog is a keyword index. Words such as `what`, `the`, and `for` are dropped because they do not distinguish one listing from another. If nothing remains, the catalog returns an empty list. That empty list is the catalog result.
 
 Later advantages, still open, are to match the characters the user typed, to explain a query that the Store discarded, and to search installed applications with a local contains check. A remote name search cannot invent hits the catalog refuses to return.
+
+## Author
+
+Developed by Vanja Sretenovic.
+
+- [github.com/vanja032](https://github.com/vanja032)
+- [vanjasretenovic.com](https://vanjasretenovic.com)

@@ -33,3 +33,4 @@ updated: 2026-10-15
 - 2026-10-15: Root `README.md` written from [[README outline]]. It covers prerequisites, the Debug and Release x64 build, the winget and Qt split, and the known Store limits.
 - 2026-10-15: Release `ApplicationGUI.exe` is started from `x64/Release` after `windeployqt` copies the Qt DLLs beside it. The root README has the full steps, including the Visual C++ runtime when `VCINSTALLDIR` is unset.
 - 2026-10-15: Decision 0002 no longer describes a mock catalog. Discover, Installed, and Updates use `msstore` only.
+- 2026-10-15: Root README shows a Discover screenshot and links the author to github.com/vanja032 and vanjasretenovic.com.
