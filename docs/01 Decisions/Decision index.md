@@ -3,7 +3,7 @@ title: Decision index
 tags:
   - decisions
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Decision index
@@ -16,3 +16,4 @@ Decisions are numbered in the order they were made. A new decision gets the next
 - [[Decision 0004 Source layout]]
 - [[Decision 0005 Docs vault]]
 - [[Decision 0006 Stack]]
+- [[Decision 0007 Pause]]

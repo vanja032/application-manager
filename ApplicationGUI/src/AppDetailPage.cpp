@@ -19,6 +19,12 @@ bool isBusy(AppAvailability availability)
            availability == AppAvailability::UpdateQueued || availability == AppAvailability::UpdateDownloading;
 }
 
+bool canPause(AppAvailability availability)
+{
+    return availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+           availability == AppAvailability::UpdateQueued || availability == AppAvailability::UpdateDownloading;
+}
+
 QString statusTitle(const AppCardModel &model)
 {
     switch (model.availability)
@@ -40,6 +46,9 @@ QString statusTitle(const AppCardModel &model)
         return QStringLiteral("Updating");
     case AppAvailability::Uninstalling:
         return QStringLiteral("Uninstalling");
+    case AppAvailability::Paused:
+    case AppAvailability::UpdatePaused:
+        return QStringLiteral("Paused");
     case AppAvailability::Error:
         return QStringLiteral("Error");
     default:
@@ -153,7 +162,7 @@ void AppDetailPage::rebuild()
     cardLayout->setSpacing(0);
 
     addInfoRow(cardLayout, QStringLiteral("Status"), statusTitle(m_model));
-    if (m_model.availability != AppAvailability::NotInstalled)
+    if (m_model.availability != AppAvailability::NotInstalled && m_model.availability != AppAvailability::Paused)
     {
         addInfoRow(cardLayout, QStringLiteral("Installed version"), versionOrUnknown(m_model.installedVersion));
     }
@@ -165,7 +174,8 @@ void AppDetailPage::rebuild()
     {
         addInfoRow(cardLayout, QStringLiteral("Details"), m_model.errorText);
     }
-    else if (isBusy(m_model.availability))
+    else if (isBusy(m_model.availability) || m_model.availability == AppAvailability::Paused ||
+             m_model.availability == AppAvailability::UpdatePaused)
     {
         QString progress = QStringLiteral("%1%").arg(m_model.progressPercent);
         if (m_model.totalMb > 0)
@@ -192,6 +202,8 @@ void AppDetailPage::rebuild()
     actions->setSpacing(8);
     actions->setAlignment(Qt::AlignLeft);
 
+    const bool paused = m_model.availability == AppAvailability::Paused ||
+                        m_model.availability == AppAvailability::UpdatePaused;
     const bool update = m_model.availability == AppAvailability::UpdateAvailable ||
                         (m_model.availability == AppAvailability::Error && m_model.retryUpdate);
     const bool installed = m_model.availability == AppAvailability::Installed ||
@@ -201,7 +213,36 @@ void AppDetailPage::rebuild()
     const bool install = m_model.availability == AppAvailability::NotInstalled ||
                          (m_model.availability == AppAvailability::Error && !m_model.retryUninstall && !m_model.retryUpdate);
 
-    if (!isBusy(m_model.availability))
+    if (paused)
+    {
+        auto *resume = createButton(QStringLiteral("Resume"), true);
+        connect(resume, &QPushButton::clicked, this, [this]() {
+            if (m_model.availability == AppAvailability::UpdatePaused)
+            {
+                emit updateRequested(m_model.packageId);
+            }
+            else
+            {
+                emit installRequested(m_model.packageId);
+            }
+        });
+        actions->addWidget(resume, 0, Qt::AlignLeft);
+
+        auto *cancel = createButton(QStringLiteral("Cancel"), false);
+        connect(cancel, &QPushButton::clicked, this, [this]() { emit cancelRequested(m_model.packageId); });
+        actions->addWidget(cancel, 0, Qt::AlignLeft);
+    }
+    else if (canPause(m_model.availability))
+    {
+        auto *pause = createButton(QStringLiteral("Pause"), false);
+        connect(pause, &QPushButton::clicked, this, [this]() { emit pauseRequested(m_model.packageId); });
+        actions->addWidget(pause, 0, Qt::AlignLeft);
+
+        auto *cancel = createButton(QStringLiteral("Cancel"), false);
+        connect(cancel, &QPushButton::clicked, this, [this]() { emit cancelRequested(m_model.packageId); });
+        actions->addWidget(cancel, 0, Qt::AlignLeft);
+    }
+    else if (!isBusy(m_model.availability))
     {
         if (update)
         {

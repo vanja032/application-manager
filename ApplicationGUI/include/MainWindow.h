@@ -50,6 +50,12 @@ class MainWindow : public QMainWindow
         NotInstalled = 2
     };
 
+    enum class StopIntent
+    {
+        Pause,
+        Cancel
+    };
+
     void configureNavigation();
     void configureSearchField();
     void configureIcons();
@@ -63,6 +69,10 @@ class MainWindow : public QMainWindow
     void startUninstall(const QString &packageId);
     void startUpdate(const QString &packageId);
     void startLaunch(const QString &packageId);
+    void stopPackage(const QString &packageId, bool pause);
+    void applyStop(const QString &packageId, bool pause, bool update);
+    bool acceptsInstallProgress(const QString &packageId) const;
+    bool acceptsUpdateProgress(const QString &packageId) const;
     void openDetail(const QString &packageId);
     void closeDetail();
     void showPackageStatus(const QString &packageId, AppAvailability availability, int percent, int downloadedMb,
@@ -105,6 +115,7 @@ class MainWindow : public QMainWindow
     std::uint64_t m_searchGeneration = 0;
     QString m_statusText;
     QHash<QString, InstallUiState> m_installUi;
+    QHash<QString, StopIntent> m_stopIntent;
     QString m_detailPackageId;
     AppDetailPage *m_detailPage = nullptr;
     WingetService m_service;

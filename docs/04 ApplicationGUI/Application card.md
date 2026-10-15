@@ -22,11 +22,11 @@ Three zones: a 48 px package icon, identity (stretches), a status panel fixed at
 
 Status:
 
-- Queued, Downloading, Installing, Updating, UninstallQueued, Uninstalling, UpdateQueued, and UpdateDownloading: [[Circular progress]] plus the phase title. Downloading and UpdateDownloading also show megabytes when the total is known.
+- Queued, Downloading, Installing, Updating, UninstallQueued, Uninstalling, UpdateQueued, and UpdateDownloading: [[Circular progress]] plus the phase title. Downloading and UpdateDownloading also show megabytes when the total is known. An `msstore` install or update usually skips Downloading and shows Installing. See [[WingetService]].
 - Error: a red dot, the title Error, and the message wrapped in the status column.
 - Everything else: a row with a 16 px icon and the title, then details indented by 24 px. The check and the update icon are the same size and aligned with the first line. The Not installed dot sits vertically with that text. Installed shows `Version` plus `installedVersion`, or `Version unknown` when that string is empty. Update available shows the installed and available version lines.
 
-Action: primary and secondary buttons, 112×36. Not installed and an install Error emit `installRequested`. Installed, and an uninstall Error, emit `launchRequested` and `uninstallRequested`. Update available, and an update Error, emit `updateRequested`, `launchRequested`, and `uninstallRequested`. Launch uses the same primary button as Install and sits above Uninstall. There is no Cancel while a package is queued, downloading, installing, updating, or uninstalling.
+Action: primary and secondary buttons, 112×36. Not installed and an install Error emit `installRequested`. Installed, and an uninstall Error, emit `launchRequested` and `uninstallRequested`. Update available, and an update Error, emit `updateRequested`, `launchRequested`, and `uninstallRequested`. Launch uses the same primary button as Install and sits above Uninstall. Queued and Downloading, for install or update, emit `pauseRequested` and `cancelRequested`. Installing and Updating have no action buttons. Paused shows Resume and Cancel. See [[Decision 0007 Pause]].
 
 A left click on the card, outside those buttons, emits `detailsRequested`. The icon, name, package id, and status panel ignore the mouse so that click reaches the card. The action panel does not, so the buttons keep their own clicks. The card uses a pointing-hand cursor.
 

@@ -23,6 +23,8 @@ class AppDetailPage : public QWidget
     void uninstallRequested(const QString &packageId);
     void updateRequested(const QString &packageId);
     void launchRequested(const QString &packageId);
+    void pauseRequested(const QString &packageId);
+    void cancelRequested(const QString &packageId);
 
   private:
     void rebuild();

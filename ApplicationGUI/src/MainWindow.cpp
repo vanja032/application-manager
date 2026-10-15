@@ -176,6 +176,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(m_detailPage, &AppDetailPage::uninstallRequested, this, &MainWindow::startUninstall, Qt::QueuedConnection);
     connect(m_detailPage, &AppDetailPage::updateRequested, this, &MainWindow::startUpdate, Qt::QueuedConnection);
     connect(m_detailPage, &AppDetailPage::launchRequested, this, &MainWindow::startLaunch, Qt::QueuedConnection);
+    connect(m_detailPage, &AppDetailPage::pauseRequested, this, [this](const QString &packageId) {
+        stopPackage(packageId, true);
+    });
+    connect(m_detailPage, &AppDetailPage::cancelRequested, this, [this](const QString &packageId) {
+        stopPackage(packageId, false);
+    });
 }
 
 MainWindow::~MainWindow() = default;
@@ -545,6 +551,7 @@ bool isInstalledCard(const AppCard *card)
     case AppAvailability::UpdateQueued:
     case AppAvailability::UpdateDownloading:
     case AppAvailability::Updating:
+    case AppAvailability::UpdatePaused:
         return true;
     case AppAvailability::Error:
         return card->retriesUninstall() || card->retriesUpdate();
@@ -561,6 +568,7 @@ bool isUpdateCard(const AppCard *card)
     case AppAvailability::UpdateQueued:
     case AppAvailability::UpdateDownloading:
     case AppAvailability::Updating:
+    case AppAvailability::UpdatePaused:
         return true;
     case AppAvailability::Error:
         return card->retriesUpdate();
@@ -602,6 +610,7 @@ void MainWindow::startInstall(const QString &packageId)
         return;
     }
 
+    m_stopIntent.remove(packageId);
     showPackageStatus(packageId, AppAvailability::Queued, 0, 0, 0, QString());
 
     m_service.InstallAppAsync(
@@ -612,6 +621,11 @@ void MainWindow::startInstall(const QString &packageId)
             QMetaObject::invokeMethod(
                 this,
                 [this, packageId, info, percent, megabytes]() {
+                    if (!acceptsInstallProgress(packageId))
+                    {
+                        return;
+                    }
+
                     switch (info.state)
                     {
                     case InstallState::Queued:
@@ -634,6 +648,14 @@ void MainWindow::startInstall(const QString &packageId)
             QMetaObject::invokeMethod(
                 this,
                 [this, packageId, completion]() {
+                    if (completion.cancelled)
+                    {
+                        const bool pause = m_stopIntent.value(packageId, StopIntent::Cancel) == StopIntent::Pause;
+                        applyStop(packageId, pause, false);
+                        return;
+                    }
+
+                    m_stopIntent.remove(packageId);
                     if (!completion.error.empty())
                     {
                         showPackageStatus(packageId, AppAvailability::Error, 0, 0, 0,
@@ -715,6 +737,7 @@ void MainWindow::startUpdate(const QString &packageId)
         return;
     }
 
+    m_stopIntent.remove(packageId);
     showPackageStatus(packageId, AppAvailability::UpdateQueued, 0, 0, 0, QString());
 
     m_service.UpdateAppAsync(
@@ -725,6 +748,11 @@ void MainWindow::startUpdate(const QString &packageId)
             QMetaObject::invokeMethod(
                 this,
                 [this, packageId, info, percent, megabytes]() {
+                    if (!acceptsUpdateProgress(packageId))
+                    {
+                        return;
+                    }
+
                     switch (info.state)
                     {
                     case UpdateState::Queued:
@@ -747,6 +775,14 @@ void MainWindow::startUpdate(const QString &packageId)
             QMetaObject::invokeMethod(
                 this,
                 [this, packageId, completion]() {
+                    if (completion.cancelled)
+                    {
+                        const bool pause = m_stopIntent.value(packageId, StopIntent::Cancel) == StopIntent::Pause;
+                        applyStop(packageId, pause, true);
+                        return;
+                    }
+
+                    m_stopIntent.remove(packageId);
                     if (!completion.error.empty())
                     {
                         showPackageStatus(packageId, AppAvailability::Error, 0, 0, 0,
@@ -759,6 +795,125 @@ void MainWindow::startUpdate(const QString &packageId)
                 },
                 Qt::QueuedConnection);
         });
+}
+
+void MainWindow::stopPackage(const QString &packageId, bool pause)
+{
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return;
+    }
+
+    const AppAvailability availability = card->availability();
+    if (availability == AppAvailability::Paused || availability == AppAvailability::UpdatePaused)
+    {
+        if (!pause)
+        {
+            applyStop(packageId, false, availability == AppAvailability::UpdatePaused);
+        }
+        return;
+    }
+
+    const bool update = availability == AppAvailability::UpdateQueued ||
+                        availability == AppAvailability::UpdateDownloading || availability == AppAvailability::Updating;
+    const bool install = availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+                         availability == AppAvailability::Installing;
+    if (!install && !update)
+    {
+        return;
+    }
+
+    if (availability == AppAvailability::Installing || availability == AppAvailability::Updating)
+    {
+        return;
+    }
+
+    m_stopIntent.insert(packageId, pause ? StopIntent::Pause : StopIntent::Cancel);
+    const OperationControl control = update ? m_service.CancelUpdate(packageId.toStdWString())
+                                            : m_service.CancelInstall(packageId.toStdWString());
+    if (control == OperationControl::RemovedFromQueue)
+    {
+        applyStop(packageId, pause, update);
+    }
+    else if (control == OperationControl::None)
+    {
+        m_stopIntent.remove(packageId);
+    }
+}
+
+void MainWindow::applyStop(const QString &packageId, bool pause, bool update)
+{
+    m_stopIntent.remove(packageId);
+    const AppCard *card = findCard(packageId);
+    const int percent = card ? card->model().progressPercent : 0;
+    const int downloadedMb = card ? card->model().downloadedMb : 0;
+    const int totalMb = card ? card->model().totalMb : 0;
+    const QString installedVersion = card ? card->model().installedVersion : QString();
+
+    if (pause)
+    {
+        showPackageStatus(packageId, update ? AppAvailability::UpdatePaused : AppAvailability::Paused, percent,
+                          downloadedMb, totalMb, QString(), false, false, installedVersion);
+        return;
+    }
+
+    if (update)
+    {
+        showPackageStatus(packageId, AppAvailability::UpdateAvailable, 0, 0, 0, QString(), false, false,
+                          installedVersion);
+        return;
+    }
+
+    showPackageStatus(packageId, AppAvailability::NotInstalled, 0, 0, 0, QString());
+}
+
+bool MainWindow::acceptsInstallProgress(const QString &packageId) const
+{
+    if (m_stopIntent.contains(packageId))
+    {
+        return false;
+    }
+
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return true;
+    }
+
+    switch (card->availability())
+    {
+    case AppAvailability::Queued:
+    case AppAvailability::Downloading:
+    case AppAvailability::Installing:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool MainWindow::acceptsUpdateProgress(const QString &packageId) const
+{
+    if (m_stopIntent.contains(packageId))
+    {
+        return false;
+    }
+
+    const AppCard *card = findCard(packageId);
+    if (!card)
+    {
+        return true;
+    }
+
+    switch (card->availability())
+    {
+    case AppAvailability::UpdateQueued:
+    case AppAvailability::UpdateDownloading:
+    case AppAvailability::Updating:
+        return true;
+    default:
+        return false;
+    }
 }
 
 void MainWindow::startLaunch(const QString &packageId)
@@ -954,6 +1109,9 @@ void MainWindow::applySearchCompletion(const SearchCompletion &completion)
         connect(card, &AppCard::uninstallRequested, this, &MainWindow::startUninstall, Qt::QueuedConnection);
         connect(card, &AppCard::updateRequested, this, &MainWindow::startUpdate, Qt::QueuedConnection);
         connect(card, &AppCard::launchRequested, this, &MainWindow::startLaunch, Qt::QueuedConnection);
+        connect(card, &AppCard::pauseRequested, this, [this](const QString &packageId) { stopPackage(packageId, true); });
+        connect(card, &AppCard::cancelRequested, this,
+                [this](const QString &packageId) { stopPackage(packageId, false); });
         connect(card, &AppCard::detailsRequested, this, &MainWindow::openDetail, Qt::QueuedConnection);
         m_cards.push_back(card);
     }

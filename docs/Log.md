@@ -26,3 +26,6 @@ updated: 2026-10-15
 - 2026-10-15: The search field starts empty. Discover opens with up to 10 featured Microsoft Store applications.
 - 2026-10-15: A card click opens an application page with Back, status, versions, and Launch, Uninstall, Update, or Install. Launch starts the installed Store application.
 - 2026-10-15: Launch uses `IApplicationActivationManager` on the window thread. `AppListEntry.LaunchAsync` from the search worker does not start the package.
+- 2026-10-15: Install and update can be paused or cancelled from the card and the application page. Pause cancels the active operation and Resume starts it again. See [[Decision 0007 Pause]].
+- 2026-10-15: Pause and Cancel hide once an install or update reaches Installing or Updating, because cancellation no longer stops the installer.
+- 2026-10-15: Recorded that `msstore` install and update progress skips Downloading and reports `DownloadProgress` as 1 while the state is Installing. Pause and Cancel therefore often do not appear. No code change.

@@ -40,6 +40,12 @@ bool isBusy(AppAvailability availability)
            availability == AppAvailability::UpdateQueued || availability == AppAvailability::UpdateDownloading;
 }
 
+bool canPause(AppAvailability availability)
+{
+    return availability == AppAvailability::Queued || availability == AppAvailability::Downloading ||
+           availability == AppAvailability::UpdateQueued || availability == AppAvailability::UpdateDownloading;
+}
+
 QString busyTitle(AppAvailability availability)
 {
     switch (availability)
@@ -147,6 +153,7 @@ void AppCard::applyStatus(AppAvailability availability, int percent, int downloa
 {
     const bool wasBusy = isBusy(m_model.availability);
     const bool nowBusy = isBusy(availability);
+    const bool pauseChanged = canPause(m_model.availability) != canPause(availability);
     if (availability == AppAvailability::NotInstalled)
     {
         m_model.installedVersion.clear();
@@ -164,7 +171,7 @@ void AppCard::applyStatus(AppAvailability availability, int percent, int downloa
     m_model.retryUpdate = retryUpdate;
     m_model.hasAvailability = true;
 
-    if (wasBusy && nowBusy && m_progress && m_phaseLabel && m_bytesLabel)
+    if (wasBusy && nowBusy && !pauseChanged && m_progress && m_phaseLabel && m_bytesLabel)
     {
         m_progress->setValue(percent);
         m_phaseLabel->setText(busyTitle(availability));
@@ -308,6 +315,11 @@ QWidget *AppCard::createStatusPanel()
         icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Refresh, QColor(QStringLiteral("#0078D4")), 16), panel);
         title = makeLabel(QStringLiteral("Update available"), QStringLiteral("statusUpdate"), panel);
     }
+    else if (m_model.availability == AppAvailability::Paused || m_model.availability == AppAvailability::UpdatePaused)
+    {
+        icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Dot, QColor(QStringLiteral("#8B919A")), 16), panel);
+        title = makeLabel(QStringLiteral("Paused"), QStringLiteral("statusMuted"), panel);
+    }
     else if (m_model.availability == AppAvailability::Error)
     {
         icon = makeStatusIcon(UiIcons::pixmap(UiIcons::Glyph::Dot, QColor(QStringLiteral("#D13438")), 16), panel);
@@ -325,7 +337,19 @@ QWidget *AppCard::createStatusPanel()
     titleRow->addStretch(1);
     column->addLayout(titleRow);
 
-    if (m_model.availability == AppAvailability::Installed)
+    if (m_model.availability == AppAvailability::Paused || m_model.availability == AppAvailability::UpdatePaused)
+    {
+        QString progress = QStringLiteral("%1%").arg(m_model.progressPercent);
+        if (m_model.totalMb > 0)
+        {
+            progress = QStringLiteral("%1% · %2 MB of %3 MB")
+                           .arg(m_model.progressPercent)
+                           .arg(m_model.downloadedMb)
+                           .arg(m_model.totalMb);
+        }
+        addDetailLine(column, progress, panel);
+    }
+    else if (m_model.availability == AppAvailability::Installed)
     {
         const QString version = m_model.installedVersion.isEmpty()
                                     ? QStringLiteral("Version unknown")
@@ -356,8 +380,37 @@ QWidget *AppCard::createActionPanel()
     column->setContentsMargins(0, 0, 0, 0);
     column->setSpacing(8);
 
-    if (m_model.availability == AppAvailability::UpdateAvailable ||
-        (m_model.availability == AppAvailability::Error && m_model.retryUpdate))
+    if (m_model.availability == AppAvailability::Paused || m_model.availability == AppAvailability::UpdatePaused)
+    {
+        auto *resume = createButton(QStringLiteral("Resume"), true);
+        connect(resume, &QPushButton::clicked, this, [this]() {
+            if (m_model.availability == AppAvailability::UpdatePaused)
+            {
+                emit updateRequested(m_model.packageId);
+            }
+            else
+            {
+                emit installRequested(m_model.packageId);
+            }
+        });
+        column->addWidget(resume);
+
+        auto *cancel = createButton(QStringLiteral("Cancel"), false);
+        connect(cancel, &QPushButton::clicked, this, [this]() { emit cancelRequested(m_model.packageId); });
+        column->addWidget(cancel);
+    }
+    else if (canPause(m_model.availability))
+    {
+        auto *pause = createButton(QStringLiteral("Pause"), false);
+        connect(pause, &QPushButton::clicked, this, [this]() { emit pauseRequested(m_model.packageId); });
+        column->addWidget(pause);
+
+        auto *cancel = createButton(QStringLiteral("Cancel"), false);
+        connect(cancel, &QPushButton::clicked, this, [this]() { emit cancelRequested(m_model.packageId); });
+        column->addWidget(cancel);
+    }
+    else if (m_model.availability == AppAvailability::UpdateAvailable ||
+             (m_model.availability == AppAvailability::Error && m_model.retryUpdate))
     {
         auto *update = createButton(QStringLiteral("Update"), true);
         connect(update, &QPushButton::clicked, this, [this]() { emit updateRequested(m_model.packageId); });

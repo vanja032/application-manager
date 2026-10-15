@@ -69,6 +69,7 @@ struct InstallCompletion
 {
     std::string error;
     std::wstring installedVersion;
+    bool cancelled = false;
 };
 
 struct UninstallCompletion
@@ -80,6 +81,14 @@ struct UpdateCompletion
 {
     std::string error;
     std::wstring installedVersion;
+    bool cancelled = false;
+};
+
+enum class OperationControl
+{
+    None,
+    RemovedFromQueue,
+    CancelRequested
 };
 
 struct LaunchCompletion
@@ -122,12 +131,14 @@ class WingetService
 
     void InstallApp(const std::wstring &packageId, ProgressCallback onProgress = {}) const;
     void InstallAppAsync(const std::wstring &packageId, ProgressCallback onProgress, InstallCallback onComplete);
+    OperationControl CancelInstall(const std::wstring &packageId);
 
     void UninstallApp(const std::wstring &packageId, UninstallProgressCallback onProgress = {}) const;
     void UninstallAppAsync(const std::wstring &packageId, UninstallProgressCallback onProgress, UninstallCallback onComplete);
 
     void UpdateApp(const std::wstring &packageId, UpdateProgressCallback onProgress = {}) const;
     void UpdateAppAsync(const std::wstring &packageId, UpdateProgressCallback onProgress, UpdateCallback onComplete);
+    OperationControl CancelUpdate(const std::wstring &packageId);
 
     std::string ActivateAppUserModelIds(const std::vector<std::wstring> &appUserModelIds) const;
     void LaunchAppAsync(const std::wstring &packageId, LaunchCallback callback);
@@ -195,6 +206,7 @@ class WingetService
     bool m_installStop = false;
     std::wstring m_activeInstallId;
     std::function<void()> m_cancelActive;
+    bool m_cancelInstallRequested = false;
 
     std::mutex m_uninstallMutex;
     std::condition_variable m_uninstallCv;
@@ -209,6 +221,7 @@ class WingetService
     bool m_updateStop = false;
     std::wstring m_activeUpdateId;
     std::function<void()> m_cancelUpdate;
+    bool m_cancelUpdateRequested = false;
 
     std::thread m_updateWorker;
     std::thread m_uninstallWorker;

@@ -19,8 +19,10 @@ Actions use the same 112×36 primary and secondary buttons as the card, stacked 
 - Update available, or an update Error: Update, Launch, Uninstall.
 - Installed, or an uninstall Error: Launch, Uninstall.
 - Not installed, or an install Error: Install.
-- Queued, downloading, installing, updating, or uninstalling: no action buttons. The card shows the phase and percent.
+- Queued or downloading, for install or update: Pause and Cancel.
+- Installing, updating, or uninstalling: no action buttons. The card shows the phase and percent.
+- Paused: Resume and Cancel. Progress stays at the last reported percent.
 
 Launch failure is text on this page. It does not change the card to Error.
 
-Related: [[Main window]], [[Application card]].
+Related: [[Main window]], [[Application card]], [[Decision 0007 Pause]].

@@ -6,6 +6,7 @@
 
 namespace WingetErrors
 {
+constexpr uint32_t OperationCanceled = 0x800704C7;
 constexpr uint32_t UpdateNotApplicable = 0x8A15002B;
 constexpr uint32_t UpgradeVersionNotNewer = 0x8A15004F;
 constexpr uint32_t UpgradeVersionUnknown = 0x8A150050;

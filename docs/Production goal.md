@@ -32,7 +32,7 @@ A C++ Windows desktop application that behaves like the Microsoft Store. The GUI
 
 | Requirement | Status |
 | --- | --- |
-| Experience similar to the Microsoft Store for managing desktop software | Partial. The GUI searches, installs, updates, uninstalls, and launches Microsoft Store applications, and opens a detail page. Pause and Cancel are not available. |
+| Experience similar to the Microsoft Store for managing desktop software | Partial. The GUI searches, installs, updates, uninstalls, and launches Microsoft Store applications, and opens a detail page. Pause and Cancel apply to install and update. Release build settings are still open. |
 | Main view with a live list of tracked and installed applications and real-time status (Available, Installing, Installed, Error) | Partial. Discover searches the catalog. Installed lists installed Microsoft Store packages. An operation moves through Queued, Downloading, Installing or Updating, Installed, or Error. |
 | Search, inspect, and install applications from the Microsoft Store source | Met. Search and install go through Core. A card click opens a detail page with status, versions, and Launch, Uninstall, Update, or Install. |
 

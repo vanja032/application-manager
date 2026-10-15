@@ -740,6 +740,40 @@ void WingetService::InstallAppAsync(const std::wstring &packageId, ProgressCallb
     m_installCv.notify_one();
 }
 
+OperationControl WingetService::CancelInstall(const std::wstring &packageId)
+{
+    std::function<void()> cancel;
+    {
+        std::lock_guard lock(m_installMutex);
+        if (m_activeInstallId == packageId)
+        {
+            m_cancelInstallRequested = true;
+            cancel = m_cancelActive;
+        }
+        else
+        {
+            const auto queued = std::find_if(m_installQueue.begin(), m_installQueue.end(),
+                                              [&packageId](const InstallRequest &request) {
+                                                  return request.packageId == packageId;
+                                              });
+            if (queued == m_installQueue.end())
+            {
+                return OperationControl::None;
+            }
+
+            m_installQueue.erase(queued);
+            return OperationControl::RemovedFromQueue;
+        }
+    }
+
+    if (cancel)
+    {
+        cancel();
+    }
+
+    return OperationControl::CancelRequested;
+}
+
 void WingetService::installWorkerMain()
 {
     const WorkerApartment apartment;
@@ -769,6 +803,7 @@ void WingetService::installWorkerMain()
             {
                 std::lock_guard lock(self->m_installMutex);
                 self->m_cancelActive = nullptr;
+                self->m_cancelInstallRequested = false;
                 self->m_activeInstallId.clear();
             }
         } clearActive{this};
@@ -779,7 +814,7 @@ void WingetService::installWorkerMain()
             completion.installedVersion = installPackage(
                 request.packageId, request.onProgress, [this](std::function<void()> cancel) {
                     std::lock_guard lock(m_installMutex);
-                    if (m_installStop)
+                    if (m_installStop || m_cancelInstallRequested)
                     {
                         cancel();
                         return;
@@ -788,9 +823,20 @@ void WingetService::installWorkerMain()
                     m_cancelActive = std::move(cancel);
                 });
         }
+        catch (const winrt::hresult_canceled &)
+        {
+            completion.cancelled = true;
+        }
         catch (const winrt::hresult_error &ex)
         {
-            completion.error = winrt::to_string(ex.message());
+            if (static_cast<uint32_t>(ex.code()) == WingetErrors::OperationCanceled)
+            {
+                completion.cancelled = true;
+            }
+            else
+            {
+                completion.error = winrt::to_string(ex.message());
+            }
         }
         catch (const std::exception &ex)
         {
@@ -942,6 +988,10 @@ std::wstring WingetService::installPackage(const std::wstring &packageId, Progre
     if (installResult.Status() != deployment::InstallResultStatus::Ok)
     {
         const auto errorCode = installResult.ExtendedErrorCode();
+        if (static_cast<uint32_t>(errorCode.value) == WingetErrors::OperationCanceled)
+        {
+            throw winrt::hresult_canceled();
+        }
 
         std::ostringstream message;
         message << "Package installation failed. HRESULT: 0x" << std::hex << static_cast<unsigned int>(errorCode.value);
@@ -1228,6 +1278,40 @@ void WingetService::UpdateAppAsync(const std::wstring &packageId, UpdateProgress
     m_updateCv.notify_one();
 }
 
+OperationControl WingetService::CancelUpdate(const std::wstring &packageId)
+{
+    std::function<void()> cancel;
+    {
+        std::lock_guard lock(m_updateMutex);
+        if (m_activeUpdateId == packageId)
+        {
+            m_cancelUpdateRequested = true;
+            cancel = m_cancelUpdate;
+        }
+        else
+        {
+            const auto queued = std::find_if(m_updateQueue.begin(), m_updateQueue.end(),
+                                              [&packageId](const UpdateRequest &request) {
+                                                  return request.packageId == packageId;
+                                              });
+            if (queued == m_updateQueue.end())
+            {
+                return OperationControl::None;
+            }
+
+            m_updateQueue.erase(queued);
+            return OperationControl::RemovedFromQueue;
+        }
+    }
+
+    if (cancel)
+    {
+        cancel();
+    }
+
+    return OperationControl::CancelRequested;
+}
+
 void WingetService::updateWorkerMain()
 {
     const WorkerApartment apartment;
@@ -1257,6 +1341,7 @@ void WingetService::updateWorkerMain()
             {
                 std::lock_guard lock(self->m_updateMutex);
                 self->m_cancelUpdate = nullptr;
+                self->m_cancelUpdateRequested = false;
                 self->m_activeUpdateId.clear();
             }
         } clearActive{this};
@@ -1267,7 +1352,7 @@ void WingetService::updateWorkerMain()
             completion.installedVersion = updatePackage(
                 request.packageId, request.onProgress, [this](std::function<void()> cancel) {
                     std::lock_guard lock(m_updateMutex);
-                    if (m_updateStop)
+                    if (m_updateStop || m_cancelUpdateRequested)
                     {
                         cancel();
                         return;
@@ -1276,9 +1361,20 @@ void WingetService::updateWorkerMain()
                     m_cancelUpdate = std::move(cancel);
                 });
         }
+        catch (const winrt::hresult_canceled &)
+        {
+            completion.cancelled = true;
+        }
         catch (const winrt::hresult_error &ex)
         {
-            completion.error = winrt::to_string(ex.message());
+            if (static_cast<uint32_t>(ex.code()) == WingetErrors::OperationCanceled)
+            {
+                completion.cancelled = true;
+            }
+            else
+            {
+                completion.error = winrt::to_string(ex.message());
+            }
         }
         catch (const std::exception &ex)
         {
@@ -1446,6 +1542,11 @@ std::wstring WingetService::updatePackage(const std::wstring &packageId, UpdateP
     if (updateResult.Status() != deployment::InstallResultStatus::Ok)
     {
         const auto errorCode = updateResult.ExtendedErrorCode();
+
+        if (static_cast<uint32_t>(errorCode.value) == WingetErrors::OperationCanceled)
+        {
+            throw winrt::hresult_canceled();
+        }
 
         if (static_cast<uint32_t>(errorCode.value) == WingetErrors::UpdateNotApplicable)
         {
